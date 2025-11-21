@@ -57,6 +57,14 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        discord: {
+          server: "hsl(var(--server-sidebar))",
+          channel: "hsl(var(--channel-sidebar))",
+          chat: "hsl(var(--chat-background))",
+          online: "hsl(var(--online))",
+          idle: "hsl(var(--idle))",
+          dnd: "hsl(var(--dnd))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
