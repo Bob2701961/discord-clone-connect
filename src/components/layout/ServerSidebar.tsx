@@ -64,13 +64,47 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
     setLoading(true);
 
     try {
+      // Validate server name
+      const trimmedName = serverName.trim();
+      if (!trimmedName) {
+        toast.error("Server name cannot be empty");
+        setLoading(false);
+        return;
+      }
+      if (trimmedName.length > 100) {
+        toast.error("Server name must be less than 100 characters");
+        setLoading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      // Ensure profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      // If profile doesn't exist, create it
+      if (!profile) {
+        const { error: createProfileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            username: user.email?.split("@")[0] || "user",
+          });
+
+        if (createProfileError) throw createProfileError;
+      }
 
       // Create server
       const { data: server, error: serverError } = await supabase
         .from("servers")
-        .insert({ name: serverName, owner_id: user.id })
+        .insert({ name: trimmedName, owner_id: user.id })
         .select()
         .single();
 
@@ -160,8 +194,12 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
                 placeholder="My Awesome Server"
                 value={serverName}
                 onChange={(e) => setServerName(e.target.value)}
+                maxLength={100}
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                {serverName.length}/100 characters
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating..." : "Create Server"}
