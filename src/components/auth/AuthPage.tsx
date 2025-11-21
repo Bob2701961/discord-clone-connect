@@ -47,12 +47,25 @@ const AuthPage = () => {
         if (error) throw error;
         toast.success("Welcome back!");
       } else {
+        // Validate username
+        const trimmedUsername = username.trim();
+        if (!trimmedUsername) {
+          toast.error("Username cannot be empty");
+          setLoading(false);
+          return;
+        }
+        if (trimmedUsername.length > 50) {
+          toast.error("Username must be less than 50 characters");
+          setLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              username,
+              username: trimmedUsername,
             },
             emailRedirectTo: `${window.location.origin}/`,
           },
@@ -96,8 +109,12 @@ const AuthPage = () => {
                   placeholder="cooluser123"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  maxLength={50}
                   required={!isLogin}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {username.length}/50 characters
+                </p>
               </div>
             )}
             <div className="space-y-2">

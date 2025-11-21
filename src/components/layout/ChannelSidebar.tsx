@@ -117,11 +117,24 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
     setLoading(true);
 
     try {
+      // Validate channel name
+      const trimmedName = channelName.trim();
+      if (!trimmedName) {
+        toast.error("Channel name cannot be empty");
+        setLoading(false);
+        return;
+      }
+      if (trimmedName.length > 100) {
+        toast.error("Channel name must be less than 100 characters");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase
         .from("channels")
         .insert({
           server_id: serverId,
-          name: channelName,
+          name: trimmedName,
           position: channels.length,
         });
 
@@ -215,8 +228,12 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
                       placeholder="general"
                       value={channelName}
                       onChange={(e) => setChannelName(e.target.value)}
+                      maxLength={100}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {channelName.length}/100 characters
+                    </p>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Creating..." : "Create Channel"}

@@ -139,7 +139,18 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !channelId) return;
+    if (!channelId) return;
+
+    // Validate message
+    const trimmedMessage = messageInput.trim();
+    if (!trimmedMessage) {
+      toast.error("Message cannot be empty");
+      return;
+    }
+    if (trimmedMessage.length > 2000) {
+      toast.error("Message must be less than 2000 characters");
+      return;
+    }
 
     setSending(true);
 
@@ -150,7 +161,7 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
       const { error } = await supabase.from("messages").insert({
         channel_id: channelId,
         user_id: user.id,
-        content: messageInput.trim(),
+        content: trimmedMessage,
       });
 
       if (error) throw error;
@@ -206,17 +217,23 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
 
       {/* Message input */}
       <div className="p-4">
-        <form onSubmit={sendMessage} className="flex space-x-2">
-          <Input
-            placeholder={`Message #${channel?.name || "channel"}`}
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            disabled={sending}
-            className="flex-1 bg-secondary"
-          />
-          <Button type="submit" size="icon" disabled={sending || !messageInput.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+        <form onSubmit={sendMessage} className="space-y-2">
+          <div className="flex space-x-2">
+            <Input
+              placeholder={`Message #${channel?.name || "channel"}`}
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              disabled={sending}
+              maxLength={2000}
+              className="flex-1 bg-secondary"
+            />
+            <Button type="submit" size="icon" disabled={sending || !messageInput.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-right">
+            {messageInput.length}/2000 characters
+          </p>
         </form>
       </div>
     </div>
