@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
 
 interface Channel {
   id: string;
@@ -196,9 +197,12 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
     <div className="w-60 bg-discord-channel flex flex-col">
       <div className="h-12 px-4 flex items-center justify-between border-b border-border shadow-sm">
         <span className="font-semibold">{server?.name}</span>
-        <Button variant="ghost" size="icon">
-          <Settings className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {server && <ShareServerDialog serverId={server.id} serverName={server.name} />}
+          <Button variant="ghost" size="icon">
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
