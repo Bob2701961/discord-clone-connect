@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import JoinServerDialog from "@/components/dialogs/JoinServerDialog";
 
 interface Server {
   id: string;
@@ -168,6 +169,8 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
           )}
         </Button>
       ))}
+
+      <JoinServerDialog onServerJoined={(id) => onServerSelect(id)} />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>

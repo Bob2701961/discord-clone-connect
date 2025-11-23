@@ -192,6 +192,7 @@ export type Database = {
           created_at: string | null
           icon_url: string | null
           id: string
+          invite_code: string | null
           name: string
           owner_id: string
         }
@@ -199,6 +200,7 @@ export type Database = {
           created_at?: string | null
           icon_url?: string | null
           id?: string
+          invite_code?: string | null
           name: string
           owner_id: string
         }
@@ -206,6 +208,7 @@ export type Database = {
           created_at?: string | null
           icon_url?: string | null
           id?: string
+          invite_code?: string | null
           name?: string
           owner_id?: string
         }
@@ -224,6 +227,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invite_code: { Args: never; Returns: string }
       is_server_member: {
         Args: { _server_id: string; _user_id: string }
         Returns: boolean
