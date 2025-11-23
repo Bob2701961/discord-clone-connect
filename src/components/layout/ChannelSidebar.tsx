@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
+import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
+import FriendsList from "@/components/friends/FriendsList";
 
 interface Channel {
   id: string;
@@ -32,6 +35,8 @@ interface Server {
 interface Profile {
   id: string;
   username: string;
+  display_name: string | null;
+  avatar_url: string | null;
   status: string;
 }
 
@@ -165,28 +170,32 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
           <span className="font-semibold">Direct Messages</span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-2">
-            <Button variant="ghost" className="w-full justify-start">
-              Friends
-            </Button>
-          </div>
+          <FriendsList />
         </div>
         {profile && (
           <div className="h-[52px] px-2 flex items-center justify-between bg-discord-server">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-xs font-semibold text-primary-foreground">
-                  {profile.username.charAt(0).toUpperCase()}
-                </span>
-              </div>
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={profile.avatar_url || ""} />
+                <AvatarFallback>
+                  {(profile.display_name || profile.username).charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div>
-                <p className="text-sm font-semibold">{profile.username}</p>
-                <p className="text-xs text-muted-foreground">{profile.status}</p>
+                <p className="text-sm font-semibold">
+                  {profile.display_name || profile.username}
+                </p>
+                {profile.display_name && (
+                  <p className="text-xs text-muted-foreground">@{profile.username}</p>
+                )}
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <ProfileSettingsDialog />
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -266,19 +275,27 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
       {profile && (
         <div className="h-[52px] px-2 flex items-center justify-between bg-discord-server">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xs font-semibold text-primary-foreground">
-                {profile.username.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={profile.avatar_url || ""} />
+              <AvatarFallback>
+                {(profile.display_name || profile.username).charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <div>
-              <p className="text-sm font-semibold">{profile.username}</p>
-              <p className="text-xs text-muted-foreground">{profile.status}</p>
+              <p className="text-sm font-semibold">
+                {profile.display_name || profile.username}
+              </p>
+              {profile.display_name && (
+                <p className="text-xs text-muted-foreground">@{profile.username}</p>
+              )}
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <ProfileSettingsDialog />
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
