@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Message {
   id: string;
@@ -12,6 +13,7 @@ interface Message {
   created_at: string;
   profiles: {
     username: string;
+    display_name: string | null;
     avatar_url: string | null;
   };
 }
@@ -82,6 +84,7 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
         created_at,
         profiles:user_id (
           username,
+          display_name,
           avatar_url
         )
       `)
@@ -119,6 +122,7 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
               created_at,
               profiles:user_id (
                 username,
+                display_name,
                 avatar_url
               )
             `)
@@ -195,14 +199,24 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
         <div className="p-4 space-y-4">
           {messages.map((message) => (
             <div key={message.id} className="flex items-start space-x-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-semibold text-primary-foreground">
-                  {message.profiles.username.charAt(0).toUpperCase()}
-                </span>
-              </div>
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={message.profiles.avatar_url || ""} />
+                <AvatarFallback>
+                  {(message.profiles.display_name || message.profiles.username)
+                    .charAt(0)
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1">
                 <div className="flex items-baseline space-x-2">
-                  <span className="font-semibold">{message.profiles.username}</span>
+                  <span className="font-semibold">
+                    {message.profiles.display_name || message.profiles.username}
+                  </span>
+                  {message.profiles.display_name && (
+                    <span className="text-xs text-muted-foreground">
+                      @{message.profiles.username}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {new Date(message.created_at).toLocaleTimeString()}
                   </span>
