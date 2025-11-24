@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Hash, Plus, Settings, LogOut } from "lucide-react";
+import { Hash, Plus, Settings, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
 import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
 import FriendsList from "@/components/friends/FriendsList";
 import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBanner";
+import ServerRolesDialog from "@/components/server/ServerRolesDialog";
 
 interface Channel {
   id: string;
@@ -51,6 +52,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
   const [channels, setChannels] = useState<Channel[]>([]);
   const [server, setServer] = useState<Server | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<string>("member");
   const [channelName, setChannelName] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,8 +65,27 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
   useEffect(() => {
     if (serverId && serverId !== "@me") {
       fetchServerAndChannels();
+      fetchUserRole();
     }
   }, [serverId]);
+
+  const fetchUserRole = async () => {
+    if (!serverId || serverId === "@me") return;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("server_roles")
+      .select("role")
+      .eq("server_id", serverId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (data) {
+      setUserRole(data.role);
+    }
+  };
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -210,6 +231,9 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
         <span className="font-semibold">{server?.name}</span>
         <div className="flex items-center gap-1">
           {server && <ShareServerDialog serverId={server.id} serverName={server.name} />}
+          {server && (userRole === "owner" || userRole === "admin") && (
+            <ServerRolesDialog serverId={server.id} userRole={userRole} />
+          )}
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>

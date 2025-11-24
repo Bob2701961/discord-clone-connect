@@ -88,6 +88,45 @@ export type Database = {
           },
         ]
       }
+      message_mentions: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentioned_user_id: string
+          message_id: string
+          read: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentioned_user_id: string
+          message_id: string
+          read?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentioned_user_id?: string
+          message_id?: string
+          read?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_mentions_mentioned_user_id_fkey"
+            columns: ["mentioned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_mentions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           channel_id: string
@@ -190,6 +229,45 @@ export type Database = {
           },
         ]
       }
+      server_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["server_role"]
+          server_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["server_role"]
+          server_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["server_role"]
+          server_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_roles_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "server_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servers: {
         Row: {
           created_at: string | null
@@ -231,13 +309,29 @@ export type Database = {
     }
     Functions: {
       generate_invite_code: { Args: never; Returns: string }
+      has_server_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["server_role"]
+          _server_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_server_role_level: {
+        Args: {
+          _min_role: Database["public"]["Enums"]["server_role"]
+          _server_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_server_member: {
         Args: { _server_id: string; _user_id: string }
         Returns: boolean
       }
     }
     Enums: {
-      [_ in never]: never
+      server_role: "owner" | "admin" | "moderator" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -364,6 +458,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      server_role: ["owner", "admin", "moderator", "member"],
+    },
   },
 } as const

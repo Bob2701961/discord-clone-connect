@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Hash, Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Send, Hash } from "lucide-react";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import MentionInput from "./MentionInput";
+import MessageContent from "./MessageContent";
 
 interface Message {
   id: string;
@@ -29,10 +30,15 @@ interface ChatAreaProps {
 
 const ChatArea = ({ channelId }: ChatAreaProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const [channel, setChannel] = useState<Channel | null>(null);
-  const [messageInput, setMessageInput] = useState("");
-  const [sending, setSending] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (channelId) {
@@ -40,15 +46,16 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
       fetchMessages();
       subscribeToMessages();
     }
-
-    return () => {
-      supabase.channel("messages").unsubscribe();
-    };
   }, [channelId]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const fetchCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setCurrentUserId(user.id);
+  };
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -113,7 +120,6 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
           filter: `channel_id=eq.${channelId}`,
         },
         async (payload) => {
-          // Fetch the new message with profile data
           const { data, error } = await supabase
             .from("messages")
             .select(`
@@ -141,40 +147,60 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
     };
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!channelId) return;
-
-    // Validate message
-    const trimmedMessage = messageInput.trim();
-    if (!trimmedMessage) {
-      toast.error("Message cannot be empty");
-      return;
-    }
-    if (trimmedMessage.length > 2000) {
-      toast.error("Message must be less than 2000 characters");
-      return;
-    }
-
-    setSending(true);
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !channelId) return;
+    setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("messages").insert({
-        channel_id: channelId,
-        user_id: user.id,
-        content: trimmedMessage,
-      });
+      const trimmedMessage = newMessage.trim();
+      if (trimmedMessage.length > 2000) {
+        toast.error("Message must be less than 2000 characters");
+        setLoading(false);
+        return;
+      }
 
-      if (error) throw error;
+      // Insert message
+      const { data: messageData, error: messageError } = await supabase
+        .from("messages")
+        .insert({
+          channel_id: channelId,
+          user_id: user.id,
+          content: trimmedMessage,
+        })
+        .select()
+        .single();
 
-      setMessageInput("");
+      if (messageError) throw messageError;
+
+      // Extract mentions and create mention records
+      const mentionPattern = /@(\w+)/g;
+      const mentions = [...trimmedMessage.matchAll(mentionPattern)].map(match => match[1]);
+      
+      if (mentions.length > 0 && messageData) {
+        // Get user IDs for mentioned usernames
+        const { data: mentionedProfiles } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .in("username", mentions);
+
+        if (mentionedProfiles && mentionedProfiles.length > 0) {
+          const mentionInserts = mentionedProfiles.map(profile => ({
+            message_id: messageData.id,
+            mentioned_user_id: profile.id,
+          }));
+
+          await supabase.from("message_mentions").insert(mentionInserts);
+        }
+      }
+
+      setNewMessage("");
     } catch (error: any) {
       toast.error(error.message || "Failed to send message");
     } finally {
-      setSending(false);
+      setLoading(false);
     }
   };
 
@@ -188,13 +214,11 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
 
   return (
     <div className="flex-1 flex flex-col bg-discord-chat">
-      {/* Channel header */}
       <div className="h-12 px-4 flex items-center border-b border-border shadow-sm">
         <Hash className="w-5 h-5 mr-2 text-muted-foreground" />
         <span className="font-semibold">{channel?.name}</span>
       </div>
 
-      {/* Messages */}
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
           {messages.map((message) => (
@@ -221,7 +245,12 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
                     {new Date(message.created_at).toLocaleTimeString()}
                   </span>
                 </div>
-                <p className="text-sm mt-1">{message.content}</p>
+                <p className="text-sm break-words whitespace-pre-wrap">
+                  <MessageContent 
+                    content={message.content} 
+                    currentUserId={currentUserId || undefined}
+                  />
+                </p>
               </div>
             </div>
           ))}
@@ -229,25 +258,20 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
         </div>
       </ScrollArea>
 
-      {/* Message input */}
-      <div className="p-4">
-        <form onSubmit={sendMessage} className="space-y-2">
-          <div className="flex space-x-2">
-            <Input
-              placeholder={`Message #${channel?.name || "channel"}`}
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              disabled={sending}
-              maxLength={2000}
-              className="flex-1 bg-secondary"
+      <div className="p-4 border-t border-border">
+        <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
+          <div className="flex-1">
+            <MentionInput
+              value={newMessage}
+              onChange={setNewMessage}
+              onSubmit={sendMessage}
+              channelId={channelId}
+              placeholder="Type a message... (use @ to mention)"
             />
-            <Button type="submit" size="icon" disabled={sending || !messageInput.trim()}>
-              <Send className="w-4 h-4" />
-            </Button>
           </div>
-          <p className="text-xs text-muted-foreground text-right">
-            {messageInput.length}/2000 characters
-          </p>
+          <Button type="submit" size="icon" disabled={loading || !newMessage.trim()}>
+            <Send className="w-4 h-4" />
+          </Button>
         </form>
       </div>
     </div>
