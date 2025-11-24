@@ -23,13 +23,26 @@ interface Profile {
   status: string;
 }
 
-const ProfileSettingsDialog = () => {
+interface ProfileSettingsDialogProps {
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onProfileUpdate?: () => void;
+}
+
+const ProfileSettingsDialog = ({ 
+  isOpen: externalIsOpen, 
+  onOpenChange: externalOnOpenChange,
+  onProfileUpdate 
+}: ProfileSettingsDialogProps = {}) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = externalOnOpenChange || setInternalIsOpen;
 
   useEffect(() => {
     if (isOpen) {
@@ -62,6 +75,12 @@ const ProfileSettingsDialog = () => {
       const trimmedDisplayName = displayName.trim();
       const trimmedUsername = username.trim();
 
+      if (!trimmedDisplayName) {
+        toast.error("Display name is required");
+        setLoading(false);
+        return;
+      }
+
       if (!trimmedUsername) {
         toast.error("Username cannot be empty");
         setLoading(false);
@@ -87,7 +106,7 @@ const ProfileSettingsDialog = () => {
         .from("profiles")
         .update({
           username: trimmedUsername,
-          display_name: trimmedDisplayName || null,
+          display_name: trimmedDisplayName,
         })
         .eq("id", user.id);
 
@@ -95,6 +114,7 @@ const ProfileSettingsDialog = () => {
 
       toast.success("Profile updated!");
       fetchProfile();
+      onProfileUpdate?.();
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
     } finally {
@@ -215,16 +235,17 @@ const ProfileSettingsDialog = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name (Optional)</Label>
+            <Label htmlFor="displayName">Display Name</Label>
             <Input
               id="displayName"
               placeholder="Your Name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={100}
+              required
             />
             <p className="text-xs text-muted-foreground">
-              {displayName.length}/100 characters
+              {displayName.length}/100 characters • Required by Dec 31, 2025
             </p>
           </div>
 
