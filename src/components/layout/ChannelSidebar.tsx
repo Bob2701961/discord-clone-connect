@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
 import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
 import FriendsList from "@/components/friends/FriendsList";
+import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBanner";
 
 interface Channel {
   id: string;
@@ -169,6 +170,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
         <div className="h-12 px-4 flex items-center justify-between border-b border-border shadow-sm">
           <span className="font-semibold">Direct Messages</span>
         </div>
+        <DisplayNameWarningBanner />
         <div className="flex-1 overflow-y-auto">
           <FriendsList />
         </div>
@@ -213,6 +215,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
           </Button>
         </div>
       </div>
+      <DisplayNameWarningBanner />
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-2 space-y-1">
