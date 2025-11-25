@@ -15,17 +15,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
 import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
 import FriendsList from "@/components/friends/FriendsList";
 import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBanner";
 import ServerRolesDialog from "@/components/server/ServerRolesDialog";
 import CustomRolesDialog from "@/components/server/CustomRolesDialog";
+import ManageCategoriesDialog from "@/components/channel/ManageCategoriesDialog";
+import CategorySection from "@/components/channel/CategorySection";
+import MessageRequestsDialog from "@/components/dm/MessageRequestsDialog";
 
 interface Channel {
   id: string;
   name: string;
   type: string;
+  position: number;
+  category_id: string | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
   position: number;
 }
 
@@ -51,10 +62,12 @@ interface ChannelSidebarProps {
 
 const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: ChannelSidebarProps) => {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [server, setServer] = useState<Server | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userRole, setUserRole] = useState<string>("member");
   const [channelName, setChannelName] = useState("");
+  const [channelType, setChannelType] = useState<"text" | "voice">("text");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -66,6 +79,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
   useEffect(() => {
     if (serverId && serverId !== "@me") {
       fetchServerAndChannels();
+      fetchCategories();
       fetchUserRole();
     }
   }, [serverId]);
@@ -100,6 +114,20 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
 
     if (!error && data) {
       setProfile(data);
+    }
+  };
+
+  const fetchCategories = async () => {
+    if (!serverId || serverId === "@me") return;
+
+    const { data, error } = await supabase
+      .from("channel_categories")
+      .select("*")
+      .eq("server_id", serverId)
+      .order("position", { ascending: true });
+
+    if (!error && data) {
+      setCategories(data);
     }
   };
 
@@ -164,6 +192,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
         .insert({
           server_id: serverId,
           name: trimmedName,
+          type: channelType,
           position: channels.length,
         });
 
@@ -171,6 +200,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
 
       toast.success("Channel created!");
       setChannelName("");
+      setChannelType("text");
       setIsDialogOpen(false);
       fetchServerAndChannels();
     } catch (error: any) {
@@ -191,6 +221,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
       <div className="w-60 bg-discord-channel flex flex-col">
         <div className="h-12 px-4 flex items-center justify-between border-b border-border shadow-sm">
           <span className="font-semibold">Direct Messages</span>
+          <MessageRequestsDialog />
         </div>
         <DisplayNameWarningBanner />
         <div className="flex-1 overflow-y-auto">
@@ -236,6 +267,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
             <>
               <ServerRolesDialog serverId={server.id} userRole={userRole} />
               <CustomRolesDialog serverId={server.id} userRole={userRole} />
+              <ManageCategoriesDialog serverId={server.id} />
             </>
           )}
           <Button variant="ghost" size="icon">
@@ -261,15 +293,28 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
                 <DialogHeader>
                   <DialogTitle>Create Channel</DialogTitle>
                   <DialogDescription>
-                    Add a new text channel to {server?.name}
+                    Add a new channel to {server?.name}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={createChannel} className="space-y-4">
                   <div className="space-y-2">
+                    <Label>Channel Type</Label>
+                    <RadioGroup value={channelType} onValueChange={(v: any) => setChannelType(v)}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="text" id="text" />
+                        <Label htmlFor="text">Text Channel</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="voice" id="voice" />
+                        <Label htmlFor="voice">Voice Channel</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="channelName">Channel Name</Label>
                     <Input
                       id="channelName"
-                      placeholder="general"
+                      placeholder={channelType === "text" ? "general" : "voice-chat"}
                       value={channelName}
                       onChange={(e) => setChannelName(e.target.value)}
                       maxLength={100}
@@ -287,19 +332,28 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
             </Dialog>
           </div>
 
-          {channels.map((channel) => (
-            <Button
-              key={channel.id}
-              variant="ghost"
-              onClick={() => onChannelSelect(channel.id)}
-              className={`w-full justify-start ${
-                selectedChannelId === channel.id ? "bg-muted" : ""
-              }`}
-            >
-              <Hash className="w-4 h-4 mr-2" />
-              {channel.name}
-            </Button>
-          ))}
+          {categories.map((category) => {
+            const categoryChannels = channels.filter(ch => ch.category_id === category.id);
+            if (categoryChannels.length === 0) return null;
+            return (
+              <CategorySection
+                key={category.id}
+                categoryName={category.name}
+                channels={categoryChannels}
+                selectedChannelId={selectedChannelId}
+                onChannelClick={onChannelSelect}
+              />
+            );
+          })}
+          
+          {channels.filter(ch => !ch.category_id).length > 0 && (
+            <CategorySection
+              categoryName="Channels"
+              channels={channels.filter(ch => !ch.category_id)}
+              selectedChannelId={selectedChannelId}
+              onChannelClick={onChannelSelect}
+            />
+          )}
         </div>
       </div>
 
