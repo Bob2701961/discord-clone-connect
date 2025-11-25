@@ -20,6 +20,7 @@ import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
 import FriendsList from "@/components/friends/FriendsList";
 import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBanner";
 import ServerRolesDialog from "@/components/server/ServerRolesDialog";
+import CustomRolesDialog from "@/components/server/CustomRolesDialog";
 
 interface Channel {
   id: string;
@@ -232,7 +233,10 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
         <div className="flex items-center gap-1">
           {server && <ShareServerDialog serverId={server.id} serverName={server.name} />}
           {server && (userRole === "owner" || userRole === "admin") && (
-            <ServerRolesDialog serverId={server.id} userRole={userRole} />
+            <>
+              <ServerRolesDialog serverId={server.id} userRole={userRole} />
+              <CustomRolesDialog serverId={server.id} userRole={userRole} />
+            </>
           )}
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
