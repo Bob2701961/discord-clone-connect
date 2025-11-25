@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import JoinServerDialog from "@/components/dialogs/JoinServerDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Server {
   id: string;
@@ -29,6 +29,7 @@ interface ServerSidebarProps {
 const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps) => {
   const [servers, setServers] = useState<Server[]>([]);
   const [serverName, setServerName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -137,6 +138,72 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
     }
   };
 
+  const joinServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const trimmedCode = inviteCode.trim().toUpperCase();
+      if (!trimmedCode || trimmedCode.length !== 8) {
+        toast.error("Please enter a valid 8-character invite code");
+        setLoading(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Find server by invite code
+      const { data: server, error: serverError } = await supabase
+        .from("servers")
+        .select("id, name")
+        .eq("invite_code", trimmedCode)
+        .maybeSingle();
+
+      if (serverError) throw serverError;
+
+      if (!server) {
+        toast.error("Invalid invite code");
+        setLoading(false);
+        return;
+      }
+
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from("server_members")
+        .select("id")
+        .eq("server_id", server.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existingMember) {
+        toast.info(`You're already a member of ${server.name}`);
+        setIsDialogOpen(false);
+        setInviteCode("");
+        onServerSelect(server.id);
+        setLoading(false);
+        return;
+      }
+
+      // Join server
+      const { error: joinError } = await supabase
+        .from("server_members")
+        .insert({ server_id: server.id, user_id: user.id });
+
+      if (joinError) throw joinError;
+
+      toast.success(`Joined ${server.name}!`);
+      setInviteCode("");
+      setIsDialogOpen(false);
+      fetchServers();
+      onServerSelect(server.id);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to join server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-[72px] bg-discord-server flex flex-col items-center py-3 space-y-2">
       <Button
@@ -170,8 +237,6 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
         </Button>
       ))}
 
-      <JoinServerDialog onServerJoined={(id) => onServerSelect(id)} />
-
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
           <Button
@@ -184,30 +249,62 @@ const ServerSidebar = ({ selectedServerId, onServerSelect }: ServerSidebarProps)
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create a server</DialogTitle>
+            <DialogTitle>Add a Server</DialogTitle>
             <DialogDescription>
-              Give your server a name to get started. You can always change it later.
+              Create a new server or join an existing one
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={createServer} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="serverName">Server Name</Label>
-              <Input
-                id="serverName"
-                placeholder="My Awesome Server"
-                value={serverName}
-                onChange={(e) => setServerName(e.target.value)}
-                maxLength={100}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                {serverName.length}/100 characters
-              </p>
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create Server"}
-            </Button>
-          </form>
+          <Tabs defaultValue="create" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="create">Create Server</TabsTrigger>
+              <TabsTrigger value="join">Join Server</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="create" className="space-y-4 mt-4">
+              <form onSubmit={createServer} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="serverName">Server Name</Label>
+                  <Input
+                    id="serverName"
+                    placeholder="My Awesome Server"
+                    value={serverName}
+                    onChange={(e) => setServerName(e.target.value)}
+                    maxLength={100}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {serverName.length}/100 characters
+                  </p>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Creating..." : "Create Server"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="join" className="space-y-4 mt-4">
+              <form onSubmit={joinServer} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="inviteCode">Invite Code</Label>
+                  <Input
+                    id="inviteCode"
+                    placeholder="ABCD1234"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    required
+                    className="font-mono text-lg tracking-wider"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    8-character invite code from server owner
+                  </p>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Joining..." : "Join Server"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>

@@ -49,6 +49,44 @@ export type Database = {
           },
         ]
       }
+      custom_roles: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          permissions: Database["public"]["Enums"]["role_permission"][] | null
+          position: number | null
+          server_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          permissions?: Database["public"]["Enums"]["role_permission"][] | null
+          position?: number | null
+          server_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          permissions?: Database["public"]["Enums"]["role_permission"][] | null
+          position?: number | null
+          server_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_roles_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       friendships: {
         Row: {
           created_at: string | null
@@ -193,6 +231,52 @@ export type Database = {
         }
         Relationships: []
       }
+      role_assignments: {
+        Row: {
+          assigned_at: string | null
+          custom_role_id: string
+          id: string
+          server_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          custom_role_id: string
+          id?: string
+          server_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          custom_role_id?: string
+          id?: string
+          server_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_assignments_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_assignments_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       server_members: {
         Row: {
           id: string
@@ -309,6 +393,14 @@ export type Database = {
     }
     Functions: {
       generate_invite_code: { Args: never; Returns: string }
+      has_permission: {
+        Args: {
+          _permission: Database["public"]["Enums"]["role_permission"]
+          _server_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_server_role: {
         Args: {
           _role: Database["public"]["Enums"]["server_role"]
@@ -331,6 +423,12 @@ export type Database = {
       }
     }
     Enums: {
+      role_permission:
+        | "manage_channels"
+        | "manage_roles"
+        | "kick_members"
+        | "ban_members"
+        | "send_messages"
       server_role: "owner" | "admin" | "moderator" | "member"
     }
     CompositeTypes: {
@@ -459,6 +557,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      role_permission: [
+        "manage_channels",
+        "manage_roles",
+        "kick_members",
+        "ban_members",
+        "send_messages",
+      ],
       server_role: ["owner", "admin", "moderator", "member"],
     },
   },
