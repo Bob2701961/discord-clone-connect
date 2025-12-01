@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MentionInput from "./MentionInput";
 import MessageContent from "./MessageContent";
+import VoiceChat from "./VoiceChat";
 
 interface Message {
   id: string;
@@ -22,6 +23,7 @@ interface Message {
 interface Channel {
   id: string;
   name: string;
+  type: string | null;
 }
 
 interface ChatAreaProps {
@@ -210,6 +212,11 @@ const ChatArea = ({ channelId }: ChatAreaProps) => {
         <p className="text-muted-foreground">Select a channel to start chatting</p>
       </div>
     );
+  }
+
+  // Show voice chat interface for voice channels
+  if (channel?.type === "voice") {
+    return <VoiceChat channelId={channelId} channelName={channel.name} />;
   }
 
   return (
