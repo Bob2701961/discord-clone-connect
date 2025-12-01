@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX, Mic, MicOff, PhoneOff, Volume2Icon } from "lucide-react";
+import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,10 +23,12 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const [connected, setConnected] = useState(false);
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
   const [voiceUsers, setVoiceUsers] = useState<VoiceUser[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
 
@@ -71,18 +73,22 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       voiceChannel
         .on('presence', { event: 'sync' }, () => {
           const state = voiceChannel.presenceState();
+          console.log('Presence state synced:', state);
           const users: VoiceUser[] = [];
           
           Object.keys(state).forEach(userId => {
             const presences = state[userId] as any[];
             if (presences && presences.length > 0) {
               const presence = presences[0];
-              if (presence && typeof presence === 'object' && 'id' in presence) {
+              // Supabase presence data is the payload we sent in track()
+              if (presence && presence.id) {
                 users.push(presence as VoiceUser);
               }
             }
           });
           
+          console.log('Parsed users:', users);
+          console.log('Current user ID:', currentUser?.id);
           setVoiceUsers(users.filter(u => u.id !== currentUser?.id));
         })
         .on('presence', { event: 'join' }, ({ newPresences }) => {
@@ -282,6 +288,54 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     });
   };
 
+  const toggleScreenShare = async () => {
+    if (!connected) {
+      toast.error("Connect to voice channel first");
+      return;
+    }
+
+    if (screenSharing) {
+      // Stop screen sharing
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+        screenStreamRef.current = null;
+      }
+      setScreenSharing(false);
+      toast.info("Screen sharing stopped");
+    } else {
+      // Start screen sharing
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: false
+        });
+        
+        screenStreamRef.current = stream;
+        
+        // Add screen share track to all peer connections
+        const screenTrack = stream.getVideoTracks()[0];
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(screenTrack);
+          } else {
+            pc.addTrack(screenTrack, stream);
+          }
+        });
+
+        // Handle screen share stop
+        screenTrack.onended = () => {
+          toggleScreenShare();
+        };
+
+        setScreenSharing(true);
+        toast.success("Screen sharing started");
+      } catch (error) {
+        toast.error("Failed to start screen sharing");
+      }
+    }
+  };
+
   // Initiate calls to all users when we join
   useEffect(() => {
     if (connected && voiceUsers.length > 0) {
@@ -303,7 +357,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       <ScrollArea className="flex-1">
         <div className="p-8">
           <div className="text-center mb-8">
-            <Volume2Icon className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <Volume2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-bold mb-2">{channelName}</h2>
             {!connected ? (
               <p className="text-muted-foreground mb-4">
@@ -375,6 +429,14 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                 className="w-12 h-12"
               >
                 {deafened ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </Button>
+              <Button
+                variant={screenSharing ? "default" : "secondary"}
+                size="icon"
+                onClick={toggleScreenShare}
+                className="w-12 h-12"
+              >
+                <MonitorUp className="w-5 h-5" />
               </Button>
               <Button
                 variant="destructive"
