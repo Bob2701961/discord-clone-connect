@@ -46,11 +46,54 @@ export type Database = {
           },
         ]
       }
+      channel_permissions: {
+        Row: {
+          can_send_messages: boolean | null
+          can_view: boolean | null
+          channel_id: string
+          created_at: string | null
+          id: string
+          role_id: string
+        }
+        Insert: {
+          can_send_messages?: boolean | null
+          can_view?: boolean | null
+          channel_id: string
+          created_at?: string | null
+          id?: string
+          role_id: string
+        }
+        Update: {
+          can_send_messages?: boolean | null
+          can_view?: boolean | null
+          channel_id?: string
+          created_at?: string | null
+          id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_permissions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           category_id: string | null
           created_at: string | null
           id: string
+          is_private: boolean | null
           name: string
           position: number | null
           server_id: string
@@ -60,6 +103,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           id?: string
+          is_private?: boolean | null
           name: string
           position?: number | null
           server_id: string
@@ -69,6 +113,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           id?: string
+          is_private?: boolean | null
           name?: string
           position?: number | null
           server_id?: string

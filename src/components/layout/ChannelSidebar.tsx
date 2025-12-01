@@ -20,9 +20,7 @@ import ShareServerDialog from "@/components/dialogs/ShareServerDialog";
 import ProfileSettingsDialog from "@/components/profile/ProfileSettingsDialog";
 import FriendsList from "@/components/friends/FriendsList";
 import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBanner";
-import ServerRolesDialog from "@/components/server/ServerRolesDialog";
-import CustomRolesDialog from "@/components/server/CustomRolesDialog";
-import ManageCategoriesDialog from "@/components/channel/ManageCategoriesDialog";
+import ServerSettingsDialog from "@/components/server/ServerSettingsDialog";
 import CategorySection from "@/components/channel/CategorySection";
 import MessageRequestsDialog from "@/components/dm/MessageRequestsDialog";
 
@@ -69,6 +67,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
   const [channelName, setChannelName] = useState("");
   const [channelType, setChannelType] = useState<"text" | "voice">("text");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -265,14 +264,20 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
           {server && <ShareServerDialog serverId={server.id} serverName={server.name} />}
           {server && (userRole === "owner" || userRole === "admin") && (
             <>
-              <ServerRolesDialog serverId={server.id} userRole={userRole} />
-              <CustomRolesDialog serverId={server.id} userRole={userRole} />
-              <ManageCategoriesDialog serverId={server.id} />
+              <Button variant="ghost" size="icon" onClick={() => setIsServerSettingsOpen(true)}>
+                <Settings className="w-4 h-4" />
+              </Button>
+              <ServerSettingsDialog
+                open={isServerSettingsOpen}
+                onOpenChange={setIsServerSettingsOpen}
+                serverId={server.id}
+                serverName={server.name}
+                serverIcon={null}
+                userRole={userRole}
+                onServerUpdate={fetchServerAndChannels}
+              />
             </>
           )}
-          <Button variant="ghost" size="icon">
-            <Settings className="w-4 h-4" />
-          </Button>
         </div>
       </div>
       <DisplayNameWarningBanner />
