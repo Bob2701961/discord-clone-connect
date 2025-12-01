@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Hash, Plus, Settings, LogOut, Shield } from "lucide-react";
+import { Hash, Plus, Settings, LogOut, Shield, Gamepad2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -246,6 +246,14 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
             </div>
             <div className="flex items-center gap-1">
               <ProfileSettingsDialog />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/games")}
+                title="Play Games"
+              >
+                <Gamepad2 className="w-4 h-4" />
+              </Button>
               <Button variant="ghost" size="icon" onClick={handleLogout}>
                 <LogOut className="w-4 h-4" />
               </Button>

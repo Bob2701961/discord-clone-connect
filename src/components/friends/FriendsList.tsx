@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, X, UserPlus } from "lucide-react";
+import { Check, X, UserPlus, MessageCircle } from "lucide-react";
 import AddFriendDialog from "./AddFriendDialog";
 
 interface Friend {
@@ -22,6 +23,7 @@ interface Friend {
 }
 
 const FriendsList = () => {
+  const navigate = useNavigate();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingRequests, setPendingRequests] = useState<Friend[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -236,7 +238,8 @@ const FriendsList = () => {
                   key={friend.id}
                   className="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 cursor-pointer"
+                    onClick={() => navigate(`/dm/${friend.friend_id}`)}>
                     <Avatar>
                       <AvatarImage src={friend.profile.avatar_url || ""} />
                       <AvatarFallback>
@@ -259,13 +262,22 @@ const FriendsList = () => {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleRemoveFriend(friend.id, friend.friend_id)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate(`/dm/${friend.friend_id}`)}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleRemoveFriend(friend.id, friend.friend_id)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
