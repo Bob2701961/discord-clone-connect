@@ -27,19 +27,31 @@ const DirectMessage = () => {
   }, [friendId]);
 
   const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !friendId) {
-      navigate("/");
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !friendId) {
+        navigate("/");
+        return;
+      }
 
-    setCurrentUserId(user.id);
-    await fetchFriendProfile();
-    await getOrCreateDmChannel(user.id);
+      setCurrentUserId(user.id);
+      
+      const profileSuccess = await fetchFriendProfile();
+      if (!profileSuccess) {
+        setLoading(false);
+        return;
+      }
+      
+      await getOrCreateDmChannel(user.id);
+    } catch (error) {
+      console.error("Error initializing DM:", error);
+      toast.error("Failed to load conversation");
+      setLoading(false);
+    }
   };
 
-  const fetchFriendProfile = async () => {
-    if (!friendId) return;
+  const fetchFriendProfile = async (): Promise<boolean> => {
+    if (!friendId) return false;
 
     const { data, error } = await supabase
       .from("profiles")
@@ -49,10 +61,11 @@ const DirectMessage = () => {
 
     if (error) {
       toast.error("Failed to load friend profile");
-      return;
+      return false;
     }
 
     setFriendProfile(data);
+    return true;
   };
 
   const getOrCreateDmChannel = async (userId: string) => {
@@ -126,7 +139,7 @@ const DirectMessage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/@me")}
+          onClick={() => navigate("/")}
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
