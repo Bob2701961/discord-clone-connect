@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp, MessageCircle, Eye, MonitorPlay, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +29,10 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [screenSharerName, setScreenSharerName] = useState<string>("");
+  const [watchingStream, setWatchingStream] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{id: string; user: string; message: string}[]>([]);
+  const [chatInput, setChatInput] = useState("");
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -123,6 +128,14 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
           await handleIceCandidate(payload);
         })
+        .on('broadcast', { event: 'voice-chat-message' }, ({ payload }) => {
+          if (payload.id) {
+            setChatMessages(prev => {
+              if (prev.some(m => m.id === payload.id)) return prev;
+              return [...prev, payload];
+            });
+          }
+        })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
             await voiceChannel.track({
@@ -143,6 +156,13 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   };
 
   const disconnect = () => {
+    // Stop screen sharing first
+    if (screenSharing && screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+      setScreenSharing(false);
+    }
+    
     // Stop all tracks
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
@@ -159,7 +179,29 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
 
     setConnected(false);
     setVoiceUsers([]);
+    setRemoteScreenStream(null);
+    setWatchingStream(false);
+    setChatMessages([]);
     toast.info("Disconnected from voice channel");
+  };
+
+  const sendChatMessage = () => {
+    if (!chatInput.trim() || !channelRef.current) return;
+    
+    const message = {
+      id: Date.now().toString(),
+      user: currentUser?.display_name || currentUser?.username || "You",
+      message: chatInput
+    };
+    
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'voice-chat-message',
+      payload: message
+    });
+    
+    setChatMessages(prev => [...prev, message]);
+    setChatInput("");
   };
 
   const createPeerConnection = (userId: string): RTCPeerConnection => {
@@ -445,28 +487,55 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
           </div>
 
           {/* Screen share display */}
-          {(remoteScreenStream || screenSharing) && (
+          {remoteScreenStream && !screenSharing && !watchingStream && (
+            <div className="mb-8 max-w-md mx-auto text-center">
+              <div className="bg-background/50 rounded-lg p-6">
+                <MonitorPlay className="w-12 h-12 mx-auto mb-3 text-primary" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  {screenSharerName} is sharing their screen
+                </p>
+                <Button onClick={() => setWatchingStream(true)} className="gap-2">
+                  <Eye className="w-4 h-4" />
+                  Watch Stream
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {(watchingStream && remoteScreenStream) && (
+            <div className="mb-8 max-w-4xl mx-auto">
+              <div className="bg-background/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Watching {screenSharerName}'s screen
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => setWatchingStream(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full rounded-lg bg-black"
+                />
+              </div>
+            </div>
+          )}
+
+          {screenSharing && (
             <div className="mb-8 max-w-4xl mx-auto">
               <div className="bg-background/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground mb-2">
-                  {screenSharing ? "You are sharing your screen" : `${screenSharerName} is sharing their screen`}
+                  You are sharing your screen
                 </p>
-                {screenSharing ? (
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full rounded-lg bg-black"
-                  />
-                ) : (
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full rounded-lg bg-black"
-                  />
-                )}
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full rounded-lg bg-black"
+                />
               </div>
             </div>
           )}
@@ -506,6 +575,41 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         </div>
       </ScrollArea>
 
+      {/* Voice Chat Panel */}
+      {connected && showChat && (
+        <div className="border-t border-border p-4 max-h-64">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold">Voice Chat</span>
+            <Button variant="ghost" size="sm" onClick={() => setShowChat(false)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <ScrollArea className="h-32 mb-2">
+            <div className="space-y-2">
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className="text-sm">
+                  <span className="font-semibold text-primary">{msg.user}: </span>
+                  <span className="text-foreground">{msg.message}</span>
+                </div>
+              ))}
+              {chatMessages.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center">No messages yet</p>
+              )}
+            </div>
+          </ScrollArea>
+          <div className="flex gap-2">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+              placeholder="Type a message..."
+              className="flex-1"
+            />
+            <Button size="sm" onClick={sendChatMessage}>Send</Button>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border-t border-border">
         <div className="flex gap-2 justify-center">
           {!connected ? (
@@ -538,6 +642,14 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                 className="w-12 h-12"
               >
                 <MonitorUp className="w-5 h-5" />
+              </Button>
+              <Button
+                variant={showChat ? "default" : "secondary"}
+                size="icon"
+                onClick={() => setShowChat(!showChat)}
+                className="w-12 h-12"
+              >
+                <MessageCircle className="w-5 h-5" />
               </Button>
               <Button
                 variant="destructive"
