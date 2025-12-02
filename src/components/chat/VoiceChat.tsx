@@ -26,11 +26,14 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const [screenSharing, setScreenSharing] = useState(false);
   const [voiceUsers, setVoiceUsers] = useState<VoiceUser[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
+  const [screenSharerName, setScreenSharerName] = useState<string>("");
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -174,8 +177,22 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
 
     // Handle incoming streams
     pc.ontrack = (event) => {
+      const track = event.track;
       const [remoteStream] = event.streams;
-      playRemoteAudio(userId, remoteStream);
+      
+      if (track.kind === 'audio') {
+        playRemoteAudio(userId, remoteStream);
+      } else if (track.kind === 'video') {
+        // Handle incoming screen share
+        const user = voiceUsers.find(u => u.id === userId);
+        setScreenSharerName(user?.display_name || user?.username || "Someone");
+        setRemoteScreenStream(remoteStream);
+        
+        track.onended = () => {
+          setRemoteScreenStream(null);
+          setScreenSharerName("");
+        };
+      }
     };
 
     // Handle ICE candidates
@@ -305,6 +322,29 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         screenStreamRef.current.getTracks().forEach(track => track.stop());
         screenStreamRef.current = null;
       }
+      
+      // Remove video senders from all peer connections
+      peerConnectionsRef.current.forEach(async (pc, oderId) => {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          pc.removeTrack(sender);
+          // Renegotiate
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'offer',
+              payload: {
+                from: currentUser?.id,
+                to: oderId,
+                offer: offer,
+              }
+            });
+          }
+        }
+      });
+      
       setScreenSharing(false);
       toast.info("Screen sharing stopped");
     } else {
@@ -317,14 +357,28 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         
         screenStreamRef.current = stream;
         
-        // Add screen share track to all peer connections
+        // Add screen share track to all peer connections and renegotiate
         const screenTrack = stream.getVideoTracks()[0];
-        peerConnectionsRef.current.forEach((pc) => {
+        peerConnectionsRef.current.forEach(async (pc, oderId) => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (sender) {
             sender.replaceTrack(screenTrack);
           } else {
             pc.addTrack(screenTrack, stream);
+            // Renegotiate after adding track
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'offer',
+                payload: {
+                  from: currentUser?.id,
+                  to: oderId,
+                  offer: offer,
+                }
+              });
+            }
           }
         });
 
@@ -352,6 +406,13 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
   }, [voiceUsers, connected]);
 
+  // Handle remote screen share display
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteScreenStream) {
+      remoteVideoRef.current.srcObject = remoteScreenStream;
+    }
+  }, [remoteScreenStream]);
+
   return (
     <div className="flex-1 flex flex-col bg-discord-chat">
       <div className="h-12 px-4 flex items-center border-b border-border shadow-sm">
@@ -374,6 +435,23 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
               </p>
             )}
           </div>
+
+          {/* Screen share display */}
+          {remoteScreenStream && (
+            <div className="mb-8 max-w-4xl mx-auto">
+              <div className="bg-background/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-2">
+                  {screenSharerName} is sharing their screen
+                </p>
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full rounded-lg bg-black"
+                />
+              </div>
+            </div>
+          )}
 
           {connected && voiceUsers.length > 0 && (
             <div className="space-y-3 max-w-md mx-auto">
