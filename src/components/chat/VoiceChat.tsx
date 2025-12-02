@@ -34,6 +34,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -413,6 +414,13 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
   }, [remoteScreenStream]);
 
+  // Handle local screen share preview
+  useEffect(() => {
+    if (localVideoRef.current && screenStreamRef.current && screenSharing) {
+      localVideoRef.current.srcObject = screenStreamRef.current;
+    }
+  }, [screenSharing]);
+
   return (
     <div className="flex-1 flex flex-col bg-discord-chat">
       <div className="h-12 px-4 flex items-center border-b border-border shadow-sm">
@@ -437,18 +445,28 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
           </div>
 
           {/* Screen share display */}
-          {remoteScreenStream && (
+          {(remoteScreenStream || screenSharing) && (
             <div className="mb-8 max-w-4xl mx-auto">
               <div className="bg-background/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground mb-2">
-                  {screenSharerName} is sharing their screen
+                  {screenSharing ? "You are sharing your screen" : `${screenSharerName} is sharing their screen`}
                 </p>
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full rounded-lg bg-black"
-                />
+                {screenSharing ? (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full rounded-lg bg-black"
+                  />
+                ) : (
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full rounded-lg bg-black"
+                  />
+                )}
               </div>
             </div>
           )}
