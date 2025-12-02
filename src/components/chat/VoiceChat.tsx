@@ -52,6 +52,11 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   };
 
   const connect = async () => {
+    if (!currentUser?.id) {
+      toast.error("Please wait, loading user data...");
+      return;
+    }
+    
     try {
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -65,7 +70,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
 
       // Join voice channel using Supabase Realtime
       const voiceChannel = supabase.channel(`voice:${channelId}`, {
-        config: { presence: { key: currentUser?.id } }
+        config: { presence: { key: currentUser.id } }
       });
 
       channelRef.current = voiceChannel;
@@ -117,10 +122,10 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
             await voiceChannel.track({
-              id: currentUser?.id,
-              username: currentUser?.username,
-              display_name: currentUser?.display_name,
-              avatar_url: currentUser?.avatar_url,
+              id: currentUser.id,
+              username: currentUser.username,
+              display_name: currentUser.display_name,
+              avatar_url: currentUser.avatar_url,
               muted: false,
             });
             setConnected(true);
@@ -265,12 +270,12 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       setMuted(!audioTrack.enabled);
       
       // Update presence
-      if (channelRef.current) {
+      if (channelRef.current && currentUser) {
         channelRef.current.track({
-          id: currentUser?.id,
-          username: currentUser?.username,
-          display_name: currentUser?.display_name,
-          avatar_url: currentUser?.avatar_url,
+          id: currentUser.id,
+          username: currentUser.username,
+          display_name: currentUser.display_name,
+          avatar_url: currentUser.avatar_url,
           muted: !audioTrack.enabled,
         });
       }
