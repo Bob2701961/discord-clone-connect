@@ -370,7 +370,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
               </p>
             ) : (
               <p className="text-muted-foreground mb-4">
-                {voiceUsers.length} {voiceUsers.length === 1 ? 'user' : 'users'} in channel
+                {voiceUsers.length + 1} {voiceUsers.length + 1 === 1 ? 'user' : 'users'} in channel
               </p>
             )}
           </div>
