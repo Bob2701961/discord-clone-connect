@@ -23,6 +23,7 @@ import DisplayNameWarningBanner from "@/components/profile/DisplayNameWarningBan
 import ServerSettingsDialog from "@/components/server/ServerSettingsDialog";
 import CategorySection from "@/components/channel/CategorySection";
 import MessageRequestsDialog from "@/components/dm/MessageRequestsDialog";
+import ServerManagementDialog from "@/components/server/ServerManagementDialog";
 
 interface Channel {
   id: string;
@@ -270,6 +271,7 @@ const ChannelSidebar = ({ serverId, selectedChannelId, onChannelSelect }: Channe
         <span className="font-semibold">{server?.name}</span>
         <div className="flex items-center gap-1">
           {server && <ShareServerDialog serverId={server.id} serverName={server.name} />}
+          {server && <ServerManagementDialog serverId={server.id} userRole={userRole} />}
           {server && (userRole === "owner" || userRole === "admin") && (
             <>
               <Button variant="ghost" size="icon" onClick={() => setIsServerSettingsOpen(true)}>
