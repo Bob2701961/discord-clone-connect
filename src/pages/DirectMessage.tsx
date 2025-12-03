@@ -95,14 +95,19 @@ const DirectMessage = () => {
     }
 
     // Create new DM channel
+    console.log("Attempting to create DM channel...");
+    
     const { data: newChannel, error: channelError } = await supabase
       .from("dm_channels")
       .insert([{}])
-      .select()
+      .select("id")
       .single();
 
+    console.log("Create DM channel result:", { newChannel, channelError });
+
     if (channelError) {
-      toast.error("Failed to create DM channel");
+      console.error("DM channel creation error details:", channelError);
+      toast.error(`Failed to create DM channel: ${channelError.message}`);
       setLoading(false);
       return;
     }
@@ -116,6 +121,7 @@ const DirectMessage = () => {
       ]);
 
     if (participantsError) {
+      console.error("Add participants error:", participantsError);
       toast.error("Failed to add participants");
       setLoading(false);
       return;
