@@ -6,7 +6,7 @@ import ChannelSidebar from "@/components/layout/ChannelSidebar";
 import ChatArea from "@/components/chat/ChatArea";
 
 const Index = () => {
-  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const [selectedServerId, setSelectedServerId] = useState<string | null>("@me");
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const navigate = useNavigate();
 
