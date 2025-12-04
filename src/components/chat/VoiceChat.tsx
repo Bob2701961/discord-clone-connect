@@ -141,6 +141,10 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         .on('broadcast', { event: 'game-state' }, ({ payload }) => {
           if (payload.type === 'tictactoe') {
             setGameState((prev: any) => ({ ...prev, tictactoe: payload.state }));
+          } else if (payload.type === 'circle') {
+            setGameState((prev: any) => ({ ...prev, circle: payload.state }));
+          } else if (payload.type === 'parkour') {
+            setGameState((prev: any) => ({ ...prev, parkour: payload.state }));
           }
         })
         .subscribe(async (status) => {

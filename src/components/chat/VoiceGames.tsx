@@ -9,7 +9,7 @@ interface VoiceGamesProps {
   gameState?: any;
 }
 
-// Tic Tac Toe Game
+// Tic Tac Toe Game - Multiplayer
 const TicTacToe = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => void; gameState?: any }) => {
   const [board, setBoard] = useState<(string | null)[]>(gameState?.board || Array(9).fill(null));
   const [isXTurn, setIsXTurn] = useState(gameState?.isXTurn ?? true);
@@ -43,7 +43,6 @@ const TicTacToe = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => vo
 
     const newBoard = [...board];
     newBoard[index] = isXTurn ? "X" : "O";
-    setBoard(newBoard);
 
     const gameWinner = checkWinner(newBoard);
     const newState = {
@@ -52,11 +51,9 @@ const TicTacToe = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => vo
       winner: gameWinner
     };
 
-    if (gameWinner) {
-      setWinner(gameWinner);
-    } else {
-      setIsXTurn(!isXTurn);
-    }
+    setBoard(newBoard);
+    setWinner(gameWinner);
+    setIsXTurn(!isXTurn);
 
     onBroadcast?.({ type: 'tictactoe', state: newState });
   };
@@ -70,38 +67,50 @@ const TicTacToe = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => vo
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
       <div className="text-center">
         {winner ? (
-          <p className="text-xl font-bold">Winner: {winner}!</p>
+          <p className="text-lg font-bold text-primary">Winner: {winner}!</p>
+        ) : board.every(c => c !== null) ? (
+          <p className="text-lg font-bold">Draw!</p>
         ) : (
-          <p className="text-lg">Current Player: {isXTurn ? "X" : "O"}</p>
+          <p className="text-sm">Current: <span className="font-bold">{isXTurn ? "X" : "O"}</span></p>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {board.map((cell, index) => (
           <Button
             key={index}
             onClick={() => handleClick(index)}
-            className="w-16 h-16 text-xl font-bold"
+            className="w-12 h-12 text-lg font-bold"
             variant={cell ? "default" : "outline"}
           >
             {cell}
           </Button>
         ))}
       </div>
-      <Button onClick={resetGame} size="sm">Reset Game</Button>
+      <Button onClick={resetGame} size="sm" variant="outline">Reset</Button>
     </div>
   );
 };
 
-// Draw a Circle Game
-const DrawCircle = () => {
+// Draw a Circle Game - Multiplayer with score competition
+const DrawCircle = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => void; gameState?: any }) => {
   const [score, setScore] = useState(0);
-  const [bestScore, setBestScore] = useState(0);
+  const [bestScore, setBestScore] = useState(gameState?.bestScore || 0);
+  const [bestPlayer, setBestPlayer] = useState(gameState?.bestPlayer || "");
   const [isDrawing, setIsDrawing] = useState(false);
   const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (gameState) {
+      if (gameState.bestScore > bestScore) {
+        setBestScore(gameState.bestScore);
+        setBestPlayer(gameState.bestPlayer || "Someone");
+      }
+    }
+  }, [gameState]);
 
   const calculateCircleScore = (pts: { x: number; y: number }[]) => {
     if (pts.length < 10) return 0;
@@ -140,7 +149,7 @@ const DrawCircle = () => {
     const ctx = canvas.getContext("2d");
     if (ctx && points.length > 0) {
       ctx.strokeStyle = "hsl(var(--primary))";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(points[points.length - 1].x, points[points.length - 1].y);
@@ -155,6 +164,8 @@ const DrawCircle = () => {
       setScore(finalScore);
       if (finalScore > bestScore) {
         setBestScore(finalScore);
+        setBestPlayer("You");
+        onBroadcast?.({ type: 'circle', state: { bestScore: finalScore, bestPlayer: "Friend" } });
       }
       setIsDrawing(false);
     }
@@ -171,50 +182,60 @@ const DrawCircle = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-2">
       <div className="text-center space-y-1">
-        <p className="text-sm">Draw a perfect circle!</p>
-        <div className="flex gap-4 justify-center text-sm">
-          <p>Score: <span className="font-bold">{score}</span></p>
-          <p>Best: <span className="font-bold text-primary">{bestScore}</span></p>
+        <p className="text-xs text-muted-foreground">Draw a perfect circle!</p>
+        <div className="flex gap-3 justify-center text-xs">
+          <p>Your: <span className="font-bold">{score}</span></p>
+          <p>Best: <span className="font-bold text-primary">{bestScore}</span> {bestPlayer && `(${bestPlayer})`}</p>
         </div>
       </div>
       <canvas
         ref={canvasRef}
-        width={250}
-        height={250}
+        width={180}
+        height={180}
         className="border-2 border-border rounded-lg cursor-crosshair bg-background"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       />
-      <Button onClick={resetCanvas} size="sm">Clear</Button>
+      <Button onClick={resetCanvas} size="sm" variant="outline">Clear</Button>
     </div>
   );
 };
 
-// Parkour Game with working physics
-const ParkourGame = () => {
-  const [position, setPosition] = useState({ x: 50, y: 300 });
+// Parkour Game - Scaled down & Multiplayer
+const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => void; gameState?: any }) => {
+  const [position, setPosition] = useState({ x: 20, y: 140 });
   const [velocity, setVelocity] = useState({ x: 0, y: 0 });
   const [isGrounded, setIsGrounded] = useState(false);
   const [score, setScore] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
+  const [otherPlayers, setOtherPlayers] = useState<{x: number; y: number}[]>([]);
   const keysRef = useRef<Set<string>>(new Set());
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
+  const GAME_WIDTH = 280;
+  const GAME_HEIGHT = 180;
+
   const platforms = [
-    { x: 0, y: 350, width: 600, height: 50 },
-    { x: 150, y: 280, width: 100, height: 20 },
-    { x: 300, y: 210, width: 100, height: 20 },
-    { x: 450, y: 140, width: 100, height: 20 },
+    { x: 0, y: 160, width: GAME_WIDTH, height: 20 },
+    { x: 60, y: 125, width: 50, height: 10 },
+    { x: 140, y: 95, width: 50, height: 10 },
+    { x: 210, y: 60, width: 50, height: 10 },
   ];
 
-  const GRAVITY = 0.8;
-  const JUMP_FORCE = -14;
-  const MOVE_SPEED = 5;
-  const PLAYER_SIZE = 24;
+  const GRAVITY = 0.6;
+  const JUMP_FORCE = -10;
+  const MOVE_SPEED = 4;
+  const PLAYER_SIZE = 16;
+
+  useEffect(() => {
+    if (gameState?.players) {
+      setOtherPlayers(gameState.players);
+    }
+  }, [gameState]);
 
   const checkCollision = useCallback((x: number, y: number) => {
     for (const platform of platforms) {
@@ -240,7 +261,6 @@ const ParkourGame = () => {
         let newVelY = velocity.y + GRAVITY;
         let grounded = false;
 
-        // Horizontal movement
         if (keysRef.current.has("ArrowLeft") || keysRef.current.has("a")) {
           newX -= MOVE_SPEED;
         }
@@ -248,10 +268,8 @@ const ParkourGame = () => {
           newX += MOVE_SPEED;
         }
 
-        // Apply gravity
         newY += newVelY;
 
-        // Check platform collisions
         const collision = checkCollision(newX, newY);
         if (collision && newVelY > 0) {
           newY = collision.y - PLAYER_SIZE;
@@ -259,27 +277,28 @@ const ParkourGame = () => {
           grounded = true;
         }
 
-        // Boundary checks
-        newX = Math.max(0, Math.min(600 - PLAYER_SIZE, newX));
-        if (newY > 400) {
-          newY = 300;
-          newX = 50;
+        newX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, newX));
+        if (newY > GAME_HEIGHT) {
+          newY = 140;
+          newX = 20;
           newVelY = 0;
         }
 
         setVelocity(v => ({ ...v, y: newVelY }));
         setIsGrounded(grounded);
 
-        // Score based on height reached
-        const heightScore = Math.max(0, Math.floor((350 - newY) / 10));
+        const heightScore = Math.max(0, Math.floor((160 - newY) / 5));
         setScore(s => Math.max(s, heightScore));
+
+        // Broadcast position to other players
+        onBroadcast?.({ type: 'parkour', state: { players: [{ x: newX, y: newY }] } });
 
         return { x: newX, y: newY };
       });
     }, 1000 / 60);
 
     return () => clearInterval(gameLoop);
-  }, [gameStarted, velocity.y, checkCollision]);
+  }, [gameStarted, velocity.y, checkCollision, onBroadcast]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -312,37 +331,38 @@ const ParkourGame = () => {
 
   const startGame = () => {
     setGameStarted(true);
-    setPosition({ x: 50, y: 300 });
+    setPosition({ x: 20, y: 140 });
     setVelocity({ x: 0, y: 0 });
     setScore(0);
     gameContainerRef.current?.focus();
   };
 
   const resetGame = () => {
-    setPosition({ x: 50, y: 300 });
+    setPosition({ x: 20, y: 140 });
     setVelocity({ x: 0, y: 0 });
     setScore(0);
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="text-center space-y-1">
-        <p className="text-sm">Arrow Keys / WASD to move, Space to jump</p>
+    <div className="flex flex-col items-center gap-2">
+      <div className="text-center">
+        <p className="text-xs text-muted-foreground">Arrow/WASD + Space</p>
         <p className="text-sm">Score: <span className="font-bold">{score}</span></p>
       </div>
       <div
         ref={gameContainerRef}
-        className="relative w-[400px] h-[300px] border-2 border-border rounded-lg bg-background overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary"
+        className="relative border-2 border-border rounded-lg bg-background overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary"
+        style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
         tabIndex={0}
       >
         {!gameStarted && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <Button onClick={startGame}>Start Game</Button>
+            <Button onClick={startGame} size="sm">Start</Button>
           </div>
         )}
-        {/* Player */}
+        {/* Your Player */}
         <div
-          className="absolute bg-primary rounded transition-none"
+          className="absolute bg-primary rounded-sm transition-none"
           style={{
             left: `${position.x}px`,
             top: `${position.y}px`,
@@ -350,6 +370,19 @@ const ParkourGame = () => {
             height: `${PLAYER_SIZE}px`,
           }}
         />
+        {/* Other Players */}
+        {otherPlayers.map((player, i) => (
+          <div
+            key={i}
+            className="absolute bg-secondary rounded-sm opacity-60 transition-none"
+            style={{
+              left: `${player.x}px`,
+              top: `${player.y}px`,
+              width: `${PLAYER_SIZE}px`,
+              height: `${PLAYER_SIZE}px`,
+            }}
+          />
+        ))}
         {/* Platforms */}
         {platforms.map((platform, i) => (
           <div
@@ -364,45 +397,45 @@ const ParkourGame = () => {
           />
         ))}
       </div>
-      <Button onClick={resetGame} size="sm">Reset</Button>
+      <Button onClick={resetGame} size="sm" variant="outline">Reset</Button>
     </div>
   );
 };
 
 const VoiceGames = ({ onBroadcast, gameState }: VoiceGamesProps) => {
   return (
-    <div className="w-full">
+    <div className="w-full max-w-sm mx-auto">
       <Tabs defaultValue="tictactoe" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
-          <TabsTrigger value="tictactoe" className="text-xs">
+        <TabsList className="grid w-full grid-cols-3 mb-3">
+          <TabsTrigger value="tictactoe" className="text-xs px-2">
             <Grid3x3 className="w-3 h-3 mr-1" />
-            Tic Tac Toe
+            TicTacToe
           </TabsTrigger>
-          <TabsTrigger value="circle" className="text-xs">
+          <TabsTrigger value="circle" className="text-xs px-2">
             <Circle className="w-3 h-3 mr-1" />
             Circle
           </TabsTrigger>
-          <TabsTrigger value="parkour" className="text-xs">
+          <TabsTrigger value="parkour" className="text-xs px-2">
             <Mountain className="w-3 h-3 mr-1" />
             Parkour
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tictactoe">
-          <Card className="p-4">
+          <Card className="p-3">
             <TicTacToe onBroadcast={onBroadcast} gameState={gameState?.tictactoe} />
           </Card>
         </TabsContent>
 
         <TabsContent value="circle">
-          <Card className="p-4">
-            <DrawCircle />
+          <Card className="p-3">
+            <DrawCircle onBroadcast={onBroadcast} gameState={gameState?.circle} />
           </Card>
         </TabsContent>
 
         <TabsContent value="parkour">
-          <Card className="p-4">
-            <ParkourGame />
+          <Card className="p-3">
+            <ParkourGame onBroadcast={onBroadcast} gameState={gameState?.parkour} />
           </Card>
         </TabsContent>
       </Tabs>
