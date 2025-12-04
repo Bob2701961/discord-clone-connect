@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp, MessageCircle, Eye, MonitorPlay, X } from "lucide-react";
+import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp, MessageCircle, Eye, MonitorPlay, X, Gamepad2 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
+import VoiceGames from "./VoiceGames";
 interface VoiceUser {
   id: string;
   username: string;
@@ -31,8 +31,10 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const [screenSharerName, setScreenSharerName] = useState<string>("");
   const [watchingStream, setWatchingStream] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showGames, setShowGames] = useState(false);
   const [chatMessages, setChatMessages] = useState<{id: string; user: string; message: string}[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [gameState, setGameState] = useState<any>({});
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -136,6 +138,11 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
             });
           }
         })
+        .on('broadcast', { event: 'game-state' }, ({ payload }) => {
+          if (payload.type === 'tictactoe') {
+            setGameState((prev: any) => ({ ...prev, tictactoe: payload.state }));
+          }
+        })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
             await voiceChannel.track({
@@ -202,6 +209,15 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     
     setChatMessages(prev => [...prev, message]);
     setChatInput("");
+  };
+
+  const broadcastGameState = (data: any) => {
+    if (!channelRef.current) return;
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'game-state',
+      payload: data
+    });
   };
 
   const createPeerConnection = (userId: string): RTCPeerConnection => {
@@ -610,6 +626,19 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         </div>
       )}
 
+      {/* Games Panel */}
+      {connected && showGames && (
+        <div className="border-t border-border p-4 max-h-[500px] overflow-auto">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold">Play Games</span>
+            <Button variant="ghost" size="sm" onClick={() => setShowGames(false)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <VoiceGames onBroadcast={broadcastGameState} gameState={gameState} />
+        </div>
+      )}
+
       <div className="p-4 border-t border-border">
         <div className="flex gap-2 justify-center">
           {!connected ? (
@@ -650,6 +679,14 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                 className="w-12 h-12"
               >
                 <MessageCircle className="w-5 h-5" />
+              </Button>
+              <Button
+                variant={showGames ? "default" : "secondary"}
+                size="icon"
+                onClick={() => setShowGames(!showGames)}
+                className="w-12 h-12"
+              >
+                <Gamepad2 className="w-5 h-5" />
               </Button>
               <Button
                 variant="destructive"
