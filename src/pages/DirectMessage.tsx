@@ -3,9 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DirectMessagesArea from "@/components/dm/DirectMessagesArea";
+import DMCallDialog from "@/components/dm/DMCallDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Phone } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -21,6 +22,7 @@ const DirectMessage = () => {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friendProfile, setFriendProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCall, setShowCall] = useState(false);
 
   useEffect(() => {
     init();
@@ -165,8 +167,20 @@ const DirectMessage = () => {
             </p>
           )}
         </div>
+        <Button variant="ghost" size="icon" className="ml-auto" onClick={() => setShowCall(true)}>
+          <Phone className="w-4 h-4" />
+        </Button>
       </div>
       <DirectMessagesArea dmChannelId={dmChannelId} currentUserId={currentUserId} />
+      {friendProfile && dmChannelId && (
+        <DMCallDialog
+          open={showCall}
+          onOpenChange={setShowCall}
+          friendProfile={friendProfile}
+          dmChannelId={dmChannelId}
+          currentUserId={currentUserId}
+        />
+      )}
     </div>
   );
 };
