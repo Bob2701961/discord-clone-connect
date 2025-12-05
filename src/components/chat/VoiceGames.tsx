@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Circle, Grid3x3, Mountain } from "lucide-react";
+import { Circle, Grid3x3, Mountain, Timer } from "lucide-react";
 
 interface VoiceGamesProps {
   onBroadcast?: (data: any) => void;
@@ -10,15 +10,16 @@ interface VoiceGamesProps {
 }
 
 // Cute Mascot Component
-const Mascot = ({ x, y, size, isMoving, isJumping }: { x: number; y: number; size: number; isMoving: boolean; isJumping: boolean }) => {
+const Mascot = ({ x, y, size, isMoving, isJumping, isBig }: { x: number; y: number; size: number; isMoving: boolean; isJumping: boolean; isBig?: boolean }) => {
+  const actualSize = isBig ? size * 1.5 : size;
   return (
     <svg
       style={{
         position: 'absolute',
         left: x,
-        top: y,
-        width: size,
-        height: size + 8,
+        top: y - (isBig ? size * 0.5 : 0),
+        width: actualSize,
+        height: actualSize + 8,
         transition: 'none',
         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
       }}
@@ -97,6 +98,38 @@ const Mascot = ({ x, y, size, isMoving, isJumping }: { x: number; y: number; siz
         </linearGradient>
       </defs>
     </svg>
+  );
+};
+
+// Enemy Component
+const Enemy = ({ x, y, type }: { x: number; y: number; type: 'goomba' | 'koopa' }) => {
+  if (type === 'goomba') {
+    return (
+      <div 
+        className="absolute"
+        style={{ left: x, top: y, width: 20, height: 20 }}
+      >
+        <div 
+          className="w-full h-full rounded-full"
+          style={{ background: 'linear-gradient(to bottom, #92400e 0%, #78350f 100%)' }}
+        >
+          <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-white rounded-full" />
+          <div className="absolute top-1/4 right-1/4 w-1.5 h-1.5 bg-white rounded-full" />
+          <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 w-3 h-1.5 bg-black rounded-full" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div 
+      className="absolute"
+      style={{ left: x, top: y, width: 20, height: 24 }}
+    >
+      <div 
+        className="w-full h-full rounded-t-full"
+        style={{ background: 'linear-gradient(to bottom, #22c55e 0%, #16a34a 100%)' }}
+      />
+    </div>
   );
 };
 
@@ -287,60 +320,192 @@ const DrawCircle = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => v
   );
 };
 
-// Mario-style Parkour Game
+// Level definitions
+const LEVELS = [
+  {
+    name: "World 1-1",
+    platforms: [
+      { x: 0, y: 155, width: 2000, height: 25, type: 'ground' },
+      { x: 200, y: 120, width: 60, height: 12, type: 'brick' },
+      { x: 280, y: 120, width: 20, height: 12, type: 'question' },
+      { x: 400, y: 90, width: 80, height: 12, type: 'brick' },
+      { x: 500, y: 60, width: 20, height: 12, type: 'question' },
+      { x: 600, y: 120, width: 100, height: 12, type: 'brick' },
+      { x: 750, y: 85, width: 60, height: 12, type: 'brick' },
+      { x: 850, y: 50, width: 20, height: 12, type: 'question' },
+      { x: 950, y: 120, width: 80, height: 12, type: 'brick' },
+    ],
+    coins: [
+      { x: 220, y: 90 }, { x: 250, y: 90 }, { x: 420, y: 60 }, { x: 450, y: 60 },
+      { x: 620, y: 90 }, { x: 650, y: 90 }, { x: 680, y: 90 }, { x: 770, y: 55 },
+    ],
+    enemies: [
+      { x: 350, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 550, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 700, y: 135, type: 'koopa' as const, direction: -1 },
+      { x: 900, y: 135, type: 'goomba' as const, direction: -1 },
+    ],
+    goal: 1000,
+  },
+  {
+    name: "World 1-2",
+    platforms: [
+      { x: 0, y: 155, width: 300, height: 25, type: 'ground' },
+      { x: 350, y: 155, width: 200, height: 25, type: 'ground' },
+      { x: 600, y: 155, width: 400, height: 25, type: 'ground' },
+      { x: 100, y: 110, width: 60, height: 12, type: 'brick' },
+      { x: 180, y: 70, width: 20, height: 12, type: 'question' },
+      { x: 300, y: 120, width: 40, height: 12, type: 'brick' },
+      { x: 400, y: 80, width: 100, height: 12, type: 'brick' },
+      { x: 550, y: 110, width: 40, height: 12, type: 'brick' },
+      { x: 700, y: 60, width: 20, height: 12, type: 'question' },
+      { x: 800, y: 100, width: 80, height: 12, type: 'brick' },
+    ],
+    coins: [
+      { x: 120, y: 80 }, { x: 320, y: 90 }, { x: 420, y: 50 }, { x: 450, y: 50 },
+      { x: 480, y: 50 }, { x: 820, y: 70 }, { x: 850, y: 70 },
+    ],
+    enemies: [
+      { x: 200, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 400, y: 135, type: 'koopa' as const, direction: 1 },
+      { x: 650, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 750, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 850, y: 135, type: 'koopa' as const, direction: 1 },
+    ],
+    goal: 950,
+  },
+  {
+    name: "World 1-3",
+    platforms: [
+      { x: 0, y: 155, width: 150, height: 25, type: 'ground' },
+      { x: 200, y: 155, width: 100, height: 25, type: 'ground' },
+      { x: 350, y: 155, width: 80, height: 25, type: 'ground' },
+      { x: 500, y: 155, width: 120, height: 25, type: 'ground' },
+      { x: 700, y: 155, width: 400, height: 25, type: 'ground' },
+      { x: 100, y: 120, width: 20, height: 12, type: 'question' },
+      { x: 250, y: 100, width: 40, height: 12, type: 'brick' },
+      { x: 380, y: 80, width: 20, height: 12, type: 'question' },
+      { x: 550, y: 100, width: 60, height: 12, type: 'brick' },
+      { x: 750, y: 60, width: 20, height: 12, type: 'question' },
+      { x: 850, y: 90, width: 100, height: 12, type: 'brick' },
+    ],
+    coins: [
+      { x: 250, y: 70 }, { x: 270, y: 70 }, { x: 560, y: 70 }, { x: 590, y: 70 },
+      { x: 870, y: 60 }, { x: 900, y: 60 }, { x: 930, y: 60 },
+    ],
+    enemies: [
+      { x: 220, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 360, y: 135, type: 'goomba' as const, direction: 1 },
+      { x: 520, y: 135, type: 'koopa' as const, direction: -1 },
+      { x: 800, y: 135, type: 'goomba' as const, direction: -1 },
+      { x: 900, y: 135, type: 'koopa' as const, direction: 1 },
+    ],
+    goal: 1000,
+  }
+];
+
+// Mario-style Parkour Game with Side Scrolling
 const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => void; gameState?: any }) => {
-  const [position, setPosition] = useState({ x: 20, y: 130 });
+  const [position, setPosition] = useState({ x: 50, y: 130 });
   const [velocity, setVelocity] = useState({ x: 0, y: 0 });
   const [isGrounded, setIsGrounded] = useState(false);
   const [score, setScore] = useState(0);
-  const [coins, setCoins] = useState([
-    { x: 80, y: 100, collected: false },
-    { x: 160, y: 70, collected: false },
-    { x: 230, y: 35, collected: false },
-  ]);
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [cameraX, setCameraX] = useState(0);
+  const [isBig, setIsBig] = useState(false);
+  const [coins, setCoins] = useState<{x: number; y: number; collected: boolean}[]>([]);
+  const [enemies, setEnemies] = useState<{x: number; y: number; type: 'goomba' | 'koopa'; direction: number; alive: boolean}[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [levelComplete, setLevelComplete] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [otherPlayers, setOtherPlayers] = useState<{x: number; y: number}[]>([]);
+  const [speedrunMode, setSpeedrunMode] = useState(false);
+  const [speedrunTime, setSpeedrunTime] = useState(0);
+  const [keySequence, setKeySequence] = useState("");
   const keysRef = useRef<Set<string>>(new Set());
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
   const GAME_WIDTH = 300;
   const GAME_HEIGHT = 180;
   const PLAYER_SIZE = 24;
-
-  // Mario-style platforms
-  const platforms = [
-    { x: 0, y: 155, width: GAME_WIDTH, height: 25, type: 'ground' },
-    { x: 50, y: 120, width: 60, height: 12, type: 'brick' },
-    { x: 130, y: 85, width: 60, height: 12, type: 'brick' },
-    { x: 210, y: 50, width: 70, height: 12, type: 'brick' },
-    { x: 110, y: 120, width: 20, height: 12, type: 'question' },
-  ];
-
   const GRAVITY = 0.5;
-  const JUMP_FORCE = -9;
-  const MOVE_SPEED = 3;
+  const JUMP_FORCE = -10;
+  const MOVE_SPEED = speedrunMode ? 5 : 3;
+
+  const level = LEVELS[currentLevel];
+
+  // Initialize level
+  useEffect(() => {
+    if (gameStarted && level) {
+      setCoins(level.coins.map(c => ({ ...c, collected: false })));
+      setEnemies(level.enemies.map(e => ({ ...e, alive: true })));
+    }
+  }, [gameStarted, currentLevel]);
 
   useEffect(() => {
     if (gameState?.players) setOtherPlayers(gameState.players);
   }, [gameState]);
 
-  const checkCollision = useCallback((x: number, y: number) => {
-    for (const platform of platforms) {
+  // Speedrun code detection
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (!gameStarted) {
+        const newSeq = (keySequence + e.key).slice(-6);
+        setKeySequence(newSeq);
+        if (newSeq === "071221") {
+          setSpeedrunMode(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [keySequence, gameStarted]);
+
+  // Speedrun timer
+  useEffect(() => {
+    if (speedrunMode && gameStarted && !gameOver && !levelComplete) {
+      const timer = setInterval(() => {
+        setSpeedrunTime(t => t + 10);
+      }, 10);
+      return () => clearInterval(timer);
+    }
+  }, [speedrunMode, gameStarted, gameOver, levelComplete]);
+
+  const checkCollision = useCallback((x: number, y: number, playerSize: number = PLAYER_SIZE) => {
+    if (!level) return null;
+    for (const platform of level.platforms) {
       if (
-        x + PLAYER_SIZE > platform.x &&
-        x < platform.x + platform.width &&
-        y + PLAYER_SIZE > platform.y &&
+        x + playerSize > platform.x - cameraX &&
+        x < platform.x + platform.width - cameraX &&
+        y + playerSize > platform.y &&
         y < platform.y + platform.height
       ) {
         return platform;
       }
     }
     return null;
-  }, []);
+  }, [level, cameraX]);
+
+  // Enemy movement
+  useEffect(() => {
+    if (!gameStarted || gameOver) return;
+    const enemyLoop = setInterval(() => {
+      setEnemies(prev => prev.map(enemy => {
+        if (!enemy.alive) return enemy;
+        let newX = enemy.x + enemy.direction * 0.5;
+        // Bounce off edges
+        if (newX < 50 || newX > level.goal - 50) {
+          return { ...enemy, direction: -enemy.direction };
+        }
+        return { ...enemy, x: newX };
+      }));
+    }, 50);
+    return () => clearInterval(enemyLoop);
+  }, [gameStarted, gameOver, level]);
 
   useEffect(() => {
-    if (!gameStarted) return;
+    if (!gameStarted || gameOver || levelComplete) return;
 
     const gameLoop = setInterval(() => {
       const moving = keysRef.current.has("ArrowLeft") || keysRef.current.has("ArrowRight") || 
@@ -358,20 +523,69 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
 
         newY += newVelY;
 
-        const collision = checkCollision(newX, newY);
-        if (collision && newVelY > 0) {
-          newY = collision.y - PLAYER_SIZE;
-          newVelY = 0;
-          grounded = true;
+        const playerSize = isBig ? PLAYER_SIZE * 1.5 : PLAYER_SIZE;
+        const collision = checkCollision(newX, newY, playerSize);
+        
+        if (collision) {
+          if (newVelY > 0) {
+            newY = collision.y - playerSize;
+            newVelY = 0;
+            grounded = true;
+          }
+          // Hit question block from below
+          if (newVelY < 0 && collision.type === 'question') {
+            setIsBig(true);
+            setScore(s => s + 200);
+          }
+          // Break brick block if big
+          if (isBig && newVelY < 0 && collision.type === 'brick') {
+            // Can't actually remove platform in this simple impl, but score bonus
+            setScore(s => s + 50);
+          }
         }
 
-        newX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, newX));
-        if (newY > GAME_HEIGHT) {
-          newY = 130;
-          newX = 20;
-          newVelY = 0;
-          setCoins(c => c.map(coin => ({ ...coin, collected: false })));
+        // Prevent going off left edge
+        newX = Math.max(0, newX);
+        
+        // Update camera for side scrolling
+        if (newX > GAME_WIDTH / 2) {
+          setCameraX(Math.max(0, newX - GAME_WIDTH / 2));
         }
+
+        // Check level completion
+        if (newX + cameraX >= level.goal) {
+          setLevelComplete(true);
+        }
+
+        // Fall off screen
+        if (newY > GAME_HEIGHT) {
+          setGameOver(true);
+          return prev;
+        }
+
+        // Enemy collision
+        const realX = newX + cameraX;
+        enemies.forEach((enemy, idx) => {
+          if (!enemy.alive) return;
+          const dx = Math.abs(realX + playerSize/2 - enemy.x - 10);
+          const dy = newY + playerSize - enemy.y;
+          
+          if (dx < 20 && dy > 0 && dy < 20) {
+            // Stomp from above
+            if (newVelY > 0) {
+              setEnemies(e => e.map((en, i) => i === idx ? {...en, alive: false} : en));
+              setScore(s => s + 100);
+              newVelY = JUMP_FORCE / 2;
+            } else {
+              // Hit from side
+              if (isBig) {
+                setIsBig(false);
+              } else {
+                setGameOver(true);
+              }
+            }
+          }
+        });
 
         setVelocity(v => ({ ...v, y: newVelY }));
         setIsGrounded(grounded);
@@ -380,11 +594,13 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
         setCoins(prevCoins => {
           let newScore = score;
           const updated = prevCoins.map(coin => {
-            if (!coin.collected && 
-                Math.abs(newX + PLAYER_SIZE/2 - coin.x - 8) < 16 && 
-                Math.abs(newY + PLAYER_SIZE/2 - coin.y - 8) < 16) {
-              newScore += 100;
-              return { ...coin, collected: true };
+            if (!coin.collected) {
+              const dx = Math.abs(newX + cameraX + playerSize/2 - coin.x - 8);
+              const dy = Math.abs(newY + playerSize/2 - coin.y - 8);
+              if (dx < 20 && dy < 20) {
+                newScore += 100;
+                return { ...coin, collected: true };
+              }
             }
             return coin;
           });
@@ -392,13 +608,13 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           return updated;
         });
 
-        onBroadcast?.({ type: 'parkour', state: { players: [{ x: newX, y: newY }] } });
+        onBroadcast?.({ type: 'parkour', state: { players: [{ x: newX + cameraX, y: newY }] } });
         return { x: newX, y: newY };
       });
     }, 1000 / 60);
 
     return () => clearInterval(gameLoop);
-  }, [gameStarted, velocity.y, checkCollision, onBroadcast, score]);
+  }, [gameStarted, velocity.y, checkCollision, onBroadcast, score, cameraX, isBig, enemies, gameOver, levelComplete, level, MOVE_SPEED]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -424,25 +640,46 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
 
   const startGame = () => {
     setGameStarted(true);
-    setPosition({ x: 20, y: 130 });
+    setGameOver(false);
+    setLevelComplete(false);
+    setPosition({ x: 50, y: 130 });
     setVelocity({ x: 0, y: 0 });
+    setCameraX(0);
     setScore(0);
-    setCoins(c => c.map(coin => ({ ...coin, collected: false })));
+    setIsBig(false);
+    setSpeedrunTime(0);
+    setCoins(level.coins.map(c => ({ ...c, collected: false })));
+    setEnemies(level.enemies.map(e => ({ ...e, alive: true })));
     gameContainerRef.current?.focus();
   };
 
+  const nextLevel = () => {
+    if (currentLevel < LEVELS.length - 1) {
+      setCurrentLevel(currentLevel + 1);
+      setLevelComplete(false);
+      setPosition({ x: 50, y: 130 });
+      setVelocity({ x: 0, y: 0 });
+      setCameraX(0);
+    }
+  };
+
   const resetGame = () => {
-    setPosition({ x: 20, y: 130 });
+    setGameOver(false);
+    setLevelComplete(false);
+    setPosition({ x: 50, y: 130 });
     setVelocity({ x: 0, y: 0 });
-    setScore(0);
-    setCoins(c => c.map(coin => ({ ...coin, collected: false })));
+    setCameraX(0);
+    setIsBig(false);
+    setCoins(level.coins.map(c => ({ ...c, collected: false })));
+    setEnemies(level.enemies.map(e => ({ ...e, alive: true })));
   };
 
   // Brick pattern renderer
   const renderBrick = (x: number, y: number, width: number, height: number) => (
     <div
+      key={`brick-${x}-${y}`}
       className="absolute"
-      style={{ left: x, top: y, width, height }}
+      style={{ left: x - cameraX, top: y, width, height }}
     >
       <div 
         className="w-full h-full"
@@ -452,7 +689,6 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           boxShadow: 'inset 0 -2px 0 #7c2d12, inset 0 2px 0 #fb923c',
         }}
       >
-        {/* Brick lines */}
         <div className="absolute inset-0 opacity-40" style={{
           backgroundImage: `
             linear-gradient(to right, #7c2d12 1px, transparent 1px),
@@ -467,9 +703,10 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
   // Question block renderer
   const renderQuestionBlock = (x: number, y: number, width: number, height: number) => (
     <div
-      className="absolute flex items-center justify-center"
+      key={`question-${x}-${y}`}
+      className="absolute flex items-center justify-center animate-pulse"
       style={{ 
-        left: x, 
+        left: x - cameraX, 
         top: y, 
         width, 
         height,
@@ -482,14 +719,27 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
     </div>
   );
 
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const centiseconds = Math.floor((ms % 1000) / 10);
+    return `${seconds}.${centiseconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="text-center flex items-center gap-3">
-        <p className="text-xs text-muted-foreground">Arrow/WASD + Space</p>
+      <div className="text-center flex items-center gap-3 flex-wrap justify-center">
+        <p className="text-xs text-muted-foreground">{level?.name || "Level"}</p>
+        {speedrunMode && (
+          <div className="flex items-center gap-1 text-orange-500">
+            <Timer className="w-3 h-3" />
+            <span className="font-mono text-sm">{formatTime(speedrunTime)}</span>
+          </div>
+        )}
         <div className="flex items-center gap-1 text-yellow-500">
           <span className="text-sm">🪙</span>
           <span className="font-bold text-sm">{score}</span>
         </div>
+        {isBig && <span className="text-xs bg-green-500 text-white px-1 rounded">BIG</span>}
       </div>
       <div
         ref={gameContainerRef}
@@ -502,40 +752,64 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
         tabIndex={0}
       >
         {/* Clouds */}
-        <div className="absolute top-3 left-8 w-12 h-4 bg-white rounded-full opacity-80" />
-        <div className="absolute top-2 left-12 w-8 h-3 bg-white rounded-full opacity-80" />
-        <div className="absolute top-4 right-16 w-10 h-3 bg-white rounded-full opacity-70" />
+        <div className="absolute top-3 left-8 w-12 h-4 bg-white rounded-full opacity-80" style={{ left: 8 - (cameraX * 0.2) % 50 }} />
+        <div className="absolute top-2 w-8 h-3 bg-white rounded-full opacity-80" style={{ left: 80 - (cameraX * 0.2) % 100 }} />
+        <div className="absolute top-4 w-10 h-3 bg-white rounded-full opacity-70" style={{ left: 180 - (cameraX * 0.2) % 120 }} />
         
         {/* Hills in background */}
-        <div className="absolute bottom-6 left-4 w-16 h-8 bg-green-400 rounded-t-full opacity-60" />
-        <div className="absolute bottom-6 right-8 w-20 h-10 bg-green-500 rounded-t-full opacity-50" />
+        <div className="absolute bottom-6 w-16 h-8 bg-green-400 rounded-t-full opacity-60" style={{ left: 20 - (cameraX * 0.3) % 200 }} />
+        <div className="absolute bottom-6 w-20 h-10 bg-green-500 rounded-t-full opacity-50" style={{ left: 150 - (cameraX * 0.3) % 250 }} />
 
-        {!gameStarted && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
+        {!gameStarted && !gameOver && !levelComplete && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 z-20 gap-2">
+            <p className="text-white text-xs">Arrow/WASD + Space</p>
+            {speedrunMode && <p className="text-orange-400 text-xs font-bold">🏃 SPEEDRUN MODE</p>}
             <Button onClick={startGame} size="sm" className="bg-green-500 hover:bg-green-600">Start</Button>
           </div>
         )}
 
-        {/* Ground */}
-        <div
-          className="absolute"
-          style={{ left: 0, top: 155, width: GAME_WIDTH, height: 25 }}
-        >
-          <div 
-            className="w-full h-full"
-            style={{
-              background: 'linear-gradient(to bottom, #65a30d 0%, #4d7c0f 30%, #3f6212 100%)',
-            }}
-          >
-            {/* Grass blades */}
-            <div className="absolute top-0 left-0 right-0 h-3" style={{
-              background: 'linear-gradient(to bottom, #84cc16, #65a30d)',
-            }} />
+        {gameOver && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 gap-2">
+            <p className="text-red-400 font-bold">Game Over!</p>
+            <Button onClick={resetGame} size="sm" className="bg-green-500 hover:bg-green-600">Try Again</Button>
           </div>
-        </div>
+        )}
+
+        {levelComplete && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 gap-2">
+            <p className="text-green-400 font-bold">Level Complete!</p>
+            {speedrunMode && <p className="text-orange-400 text-sm">Time: {formatTime(speedrunTime)}</p>}
+            <p className="text-white text-sm">Score: {score}</p>
+            {currentLevel < LEVELS.length - 1 ? (
+              <Button onClick={nextLevel} size="sm" className="bg-green-500 hover:bg-green-600">Next Level</Button>
+            ) : (
+              <Button onClick={() => { setCurrentLevel(0); startGame(); }} size="sm" className="bg-green-500 hover:bg-green-600">Play Again</Button>
+            )}
+          </div>
+        )}
+
+        {/* Ground and platforms */}
+        {level?.platforms.filter(p => p.type === 'ground').map((platform, i) => (
+          <div
+            key={`ground-${i}`}
+            className="absolute"
+            style={{ left: platform.x - cameraX, top: platform.y, width: platform.width, height: platform.height }}
+          >
+            <div 
+              className="w-full h-full"
+              style={{
+                background: 'linear-gradient(to bottom, #65a30d 0%, #4d7c0f 30%, #3f6212 100%)',
+              }}
+            >
+              <div className="absolute top-0 left-0 right-0 h-3" style={{
+                background: 'linear-gradient(to bottom, #84cc16, #65a30d)',
+              }} />
+            </div>
+          </div>
+        ))}
 
         {/* Platforms */}
-        {platforms.filter(p => p.type !== 'ground').map((platform, i) => (
+        {level?.platforms.filter(p => p.type !== 'ground').map((platform) => (
           platform.type === 'question' 
             ? renderQuestionBlock(platform.x, platform.y, platform.width, platform.height)
             : renderBrick(platform.x, platform.y, platform.width, platform.height)
@@ -546,7 +820,7 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           <div
             key={i}
             className="absolute animate-bounce"
-            style={{ left: coin.x, top: coin.y }}
+            style={{ left: coin.x - cameraX, top: coin.y }}
           >
             <div 
               className="w-4 h-4 rounded-full"
@@ -558,6 +832,20 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           </div>
         ))}
 
+        {/* Enemies */}
+        {enemies.map((enemy, i) => enemy.alive && (
+          <Enemy key={i} x={enemy.x - cameraX} y={enemy.y} type={enemy.type} />
+        ))}
+
+        {/* Goal flag */}
+        <div
+          className="absolute"
+          style={{ left: level.goal - cameraX - 5, top: 80, width: 10, height: 75 }}
+        >
+          <div className="w-1 h-full bg-gray-600 mx-auto" />
+          <div className="absolute top-0 left-1 w-8 h-6 bg-green-500" style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }} />
+        </div>
+
         {/* Mascot Player */}
         <Mascot 
           x={position.x} 
@@ -565,6 +853,7 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           size={PLAYER_SIZE} 
           isMoving={isMoving}
           isJumping={!isGrounded}
+          isBig={isBig}
         />
 
         {/* Other Players (ghost) */}
@@ -573,7 +862,7 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
             key={i}
             className="absolute rounded-full opacity-40"
             style={{
-              left: player.x,
+              left: player.x - cameraX,
               top: player.y,
               width: PLAYER_SIZE,
               height: PLAYER_SIZE,
@@ -582,7 +871,18 @@ const ParkourGame = ({ onBroadcast, gameState }: { onBroadcast?: (data: any) => 
           />
         ))}
       </div>
-      <Button onClick={resetGame} size="sm" variant="outline">Reset</Button>
+      <div className="flex gap-2">
+        <Button onClick={resetGame} size="sm" variant="outline">Reset</Button>
+        <select 
+          className="text-xs px-2 py-1 rounded border bg-background"
+          value={currentLevel}
+          onChange={(e) => { setCurrentLevel(Number(e.target.value)); setGameStarted(false); }}
+        >
+          {LEVELS.map((l, i) => (
+            <option key={i} value={i}>{l.name}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 };

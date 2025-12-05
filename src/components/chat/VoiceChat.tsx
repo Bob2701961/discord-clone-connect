@@ -2,17 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp, MessageCircle, Eye, MonitorPlay, X, Gamepad2 } from "lucide-react";
+import { Volume2, VolumeX, Mic, MicOff, PhoneOff, MonitorUp, MessageCircle, Eye, MonitorPlay, X, Gamepad2, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import VoiceGames from "./VoiceGames";
+
 interface VoiceUser {
   id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
   muted: boolean;
+  listenOnly?: boolean;
 }
 
 interface VoiceChatProps {
@@ -35,6 +37,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   const [chatMessages, setChatMessages] = useState<{id: string; user: string; message: string}[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [gameState, setGameState] = useState<any>({});
+  const [listenOnly, setListenOnly] = useState(false);
   
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -62,22 +65,26 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
   };
 
-  const connect = async () => {
+  const connect = async (withMic: boolean = true) => {
     if (!currentUser?.id) {
       toast.error("Please wait, loading user data...");
       return;
     }
     
     try {
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } 
-      });
-      localStreamRef.current = stream;
+      setListenOnly(!withMic);
+      
+      // Get microphone access only if not listen-only
+      if (withMic) {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } 
+        });
+        localStreamRef.current = stream;
+      }
 
       // Join voice channel using Supabase Realtime
       const voiceChannel = supabase.channel(`voice:${channelId}`, {
@@ -96,7 +103,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
             const presences = state[userId] as any[];
             if (presences && presences.length > 0) {
               const presence = presences[0];
-              // Supabase presence data is the payload we sent in track()
               if (presence && presence.id) {
                 users.push(presence as VoiceUser);
               }
@@ -104,7 +110,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
           });
           
           console.log('Parsed users:', users);
-          console.log('Current user ID:', currentUser?.id);
           setVoiceUsers(users.filter(u => u.id !== currentUser?.id));
         })
         .on('presence', { event: 'join' }, ({ newPresences }) => {
@@ -112,7 +117,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         })
         .on('presence', { event: 'leave' }, ({ leftPresences }) => {
           console.log('User left:', leftPresences);
-          // Clean up peer connections for users who left
           leftPresences.forEach((presence: any) => {
             const pc = peerConnectionsRef.current.get(presence.id);
             if (pc) {
@@ -154,10 +158,12 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
               username: currentUser.username,
               display_name: currentUser.display_name,
               avatar_url: currentUser.avatar_url,
-              muted: false,
+              muted: !withMic,
+              listenOnly: !withMic,
             });
             setConnected(true);
-            toast.success("Connected to voice channel");
+            setMuted(!withMic);
+            toast.success(withMic ? "Connected to voice channel" : "Joined as listener");
           }
         });
 
@@ -167,22 +173,18 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   };
 
   const disconnect = () => {
-    // Stop screen sharing first
     if (screenSharing && screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
       setScreenSharing(false);
     }
     
-    // Stop all tracks
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
 
-    // Close all peer connections
     peerConnectionsRef.current.forEach(pc => pc.close());
     peerConnectionsRef.current.clear();
 
-    // Unsubscribe from channel
     if (channelRef.current) {
       channelRef.current.unsubscribe();
       channelRef.current = null;
@@ -193,6 +195,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     setRemoteScreenStream(null);
     setWatchingStream(false);
     setChatMessages([]);
+    setListenOnly(false);
     toast.info("Disconnected from voice channel");
   };
 
@@ -231,14 +234,12 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     
     const pc = new RTCPeerConnection(configuration);
 
-    // Add local stream tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current!);
       });
     }
 
-    // Handle incoming streams
     pc.ontrack = (event) => {
       const track = event.track;
       const [remoteStream] = event.streams;
@@ -246,7 +247,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       if (track.kind === 'audio') {
         playRemoteAudio(userId, remoteStream);
       } else if (track.kind === 'video') {
-        // Handle incoming screen share
         const user = voiceUsers.find(u => u.id === userId);
         setScreenSharerName(user?.display_name || user?.username || "Someone");
         setRemoteScreenStream(remoteStream);
@@ -258,7 +258,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       }
     };
 
-    // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate && channelRef.current) {
         channelRef.current.send({
@@ -344,12 +343,13 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
   };
 
   const toggleMute = () => {
+    if (listenOnly) return;
+    
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       audioTrack.enabled = !audioTrack.enabled;
       setMuted(!audioTrack.enabled);
       
-      // Update presence
       if (channelRef.current && currentUser) {
         channelRef.current.track({
           id: currentUser.id,
@@ -357,6 +357,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
           display_name: currentUser.display_name,
           avatar_url: currentUser.avatar_url,
           muted: !audioTrack.enabled,
+          listenOnly: false,
         });
       }
     }
@@ -364,7 +365,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
 
   const toggleDeafen = () => {
     setDeafened(!deafened);
-    // Mute all remote audio elements
     voiceUsers.forEach(user => {
       const audioElement = document.getElementById(`audio-${user.id}`) as HTMLAudioElement;
       if (audioElement) {
@@ -380,18 +380,15 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
 
     if (screenSharing) {
-      // Stop screen sharing
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach(track => track.stop());
         screenStreamRef.current = null;
       }
       
-      // Remove video senders from all peer connections
       peerConnectionsRef.current.forEach(async (pc, oderId) => {
         const sender = pc.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
           pc.removeTrack(sender);
-          // Renegotiate
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           if (channelRef.current) {
@@ -411,7 +408,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       setScreenSharing(false);
       toast.info("Screen sharing stopped");
     } else {
-      // Start screen sharing
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
@@ -420,7 +416,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
         
         screenStreamRef.current = stream;
         
-        // Add screen share track to all peer connections and renegotiate
         const screenTrack = stream.getVideoTracks()[0];
         peerConnectionsRef.current.forEach(async (pc, oderId) => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
@@ -428,7 +423,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
             sender.replaceTrack(screenTrack);
           } else {
             pc.addTrack(screenTrack, stream);
-            // Renegotiate after adding track
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             if (channelRef.current) {
@@ -445,7 +439,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
           }
         });
 
-        // Handle screen share stop
         screenTrack.onended = () => {
           toggleScreenShare();
         };
@@ -458,7 +451,6 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
   };
 
-  // Initiate calls to all users when we join
   useEffect(() => {
     if (connected && voiceUsers.length > 0) {
       voiceUsers.forEach(user => {
@@ -469,14 +461,12 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
     }
   }, [voiceUsers, connected]);
 
-  // Handle remote screen share display
   useEffect(() => {
     if (remoteVideoRef.current && remoteScreenStream) {
       remoteVideoRef.current.srcObject = remoteScreenStream;
     }
   }, [remoteScreenStream]);
 
-  // Handle local screen share preview
   useEffect(() => {
     if (localVideoRef.current && screenStreamRef.current && screenSharing) {
       localVideoRef.current.srcObject = screenStreamRef.current;
@@ -488,6 +478,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       <div className="h-12 px-4 flex items-center border-b border-border shadow-sm">
         <Volume2 className="w-5 h-5 mr-2 text-muted-foreground" />
         <span className="font-semibold">{channelName}</span>
+        {listenOnly && <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded">Listen Only</span>}
       </div>
 
       <ScrollArea className="flex-1">
@@ -571,8 +562,11 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="font-semibold">
+                    <div className="font-semibold flex items-center gap-2">
                       {user.display_name || user.username}
+                      {user.listenOnly && (
+                        <Headphones className="w-3 h-3 text-muted-foreground" />
+                      )}
                     </div>
                     {user.display_name && (
                       <div className="text-xs text-muted-foreground">
@@ -580,7 +574,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                       </div>
                     )}
                   </div>
-                  {user.muted && <MicOff className="w-4 h-4 text-destructive" />}
+                  {user.muted && !user.listenOnly && <MicOff className="w-4 h-4 text-destructive" />}
                   <audio id={`audio-${user.id}`} autoPlay />
                 </div>
               ))}
@@ -644,12 +638,18 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
       )}
 
       <div className="p-4 border-t border-border">
-        <div className="flex gap-2 justify-center">
+        <div className="flex gap-2 justify-center flex-wrap">
           {!connected ? (
-            <Button onClick={connect} size="lg" className="gap-2">
-              <Volume2 className="w-5 h-5" />
-              Join Voice Channel
-            </Button>
+            <>
+              <Button onClick={() => connect(true)} size="lg" className="gap-2">
+                <Volume2 className="w-5 h-5" />
+                Join Voice
+              </Button>
+              <Button onClick={() => connect(false)} size="lg" variant="secondary" className="gap-2">
+                <Headphones className="w-5 h-5" />
+                Listen Only
+              </Button>
+            </>
           ) : (
             <>
               <Button
@@ -657,6 +657,7 @@ const VoiceChat = ({ channelId, channelName }: VoiceChatProps) => {
                 size="icon"
                 onClick={toggleMute}
                 className="w-12 h-12"
+                disabled={listenOnly}
               >
                 {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               </Button>
