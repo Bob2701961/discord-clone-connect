@@ -41,7 +41,7 @@ const DMCallDialog = ({ open, onOpenChange, friendProfile, dmChannelId, currentU
   }, [open]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (callStatus === 'connected' && callStartRef.current) {
       interval = setInterval(() => {
         setCallDuration(Math.floor((Date.now() - callStartRef.current!) / 1000));
